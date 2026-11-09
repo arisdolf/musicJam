@@ -1,17 +1,18 @@
 # Jamroom
 
-A shared listening room prototype built with React and Vite. Search for YouTube videos by song, artist, or mood, add them to a queue, and play them in the embedded YouTube player.
+A small, mobile-first shared music player. Create a room or enter a room code, search YouTube by song or artist, and add tracks to the shared queue.
 
-## Run it
+## Start locally
 
-1. Copy `.env.example` to `.env`.
-2. Set `VITE_YOUTUBE_API_KEY` to a YouTube Data API v3 key with the YouTube Data API enabled.
-3. Run `npm install` and `npm run dev`.
+1. Copy `.env.example` to `.env` and add a YouTube Data API v3 key.
+2. In one terminal run `npm install` and `npm run server`.
+3. In another terminal run `npm run dev`.
+4. Open the Vite address. On a phone on the same Wi-Fi, use the computer's LAN address and port shown by Vite.
 
-The API key is used in browser requests, so restrict it to your deployed website's referrer and enable only the YouTube Data API in Google Cloud. YouTube search can return quota or API-key errors in the search panel.
+Vite proxies `/ws` to the room server. The server listens on port `3001`. For YouTube search, enable the YouTube Data API in Google Cloud and restrict the key to your website's referrer.
 
-## Rooms and synchronization
+## Room sharing
 
-Room IDs are stored in the `?room=` URL parameter. Queue, current track, and play/pause updates are shared between tabs on the same browser using `BroadcastChannel` and local storage. Invite links let someone open the same room, but this prototype does not synchronize between different devices or browsers. Cross-device rooms need a realtime backend (for example, Supabase Realtime or Firebase) and a server-side room state.
+Room codes and `?room=CODE` links are the same join flow. The room server shares the queue and play/pause/track selection between connected devices. The included server keeps room state in memory, so rooms reset when it restarts. For a public deployment, host `server/server.js` on a reachable server and set `VITE_ROOM_SERVER_URL` to its WebSocket URL (for example `wss://your-server.example/ws`). Use HTTPS/WSS in production.
 
-The YouTube iframe player runs separately for each listener. Playback can be affected by browser autoplay rules, video availability, and YouTube's embedding restrictions.
+Each listener has their own YouTube player. They may need to press play once because mobile browsers can block remote autoplay. Video availability and embedding are subject to YouTube.
