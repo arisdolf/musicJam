@@ -9,7 +9,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "node server/server.js"
+    "db:migrate": "node server/migrate.js",
+    "start": "node server/migrate.js && node server/server.js"
   },
   "dependencies": {
     "react": "^19.3.1",
