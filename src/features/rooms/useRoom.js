@@ -21,6 +21,14 @@ export function useRoom(roomCode) {
 
   useEffect(() => {
     if (!roomCode) return undefined
+
+    // Load this room's saved state whenever the code changes (e.g. playing a playlist).
+    const initial = savedRoom(roomCode)
+    roomRef.current = initial
+    setRoom(initial)
+    setConnection('connecting')
+    setMembers(1)
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const socketUrl = import.meta.env.VITE_ROOM_SERVER_URL || `${protocol}//${window.location.host}/ws`
     const socket = new WebSocket(socketUrl)
