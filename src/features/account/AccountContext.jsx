@@ -13,6 +13,7 @@ import { auth, googleProvider } from '../../services/firebase'
 import {
   subscribeToPlaylists,
   createPlaylist as fsCreatePlaylist,
+  renamePlaylist as fsRenamePlaylist,
   deletePlaylist as fsDeletePlaylist,
   addTrackToPlaylist,
   removeTrackFromPlaylist,
@@ -92,6 +93,13 @@ export function AccountProvider({ children }) {
     })
   }, [user, playlists])
 
+  const renamePlaylist = useCallback(async (playlistId, name) => {
+    if (!user) throw new Error('Not logged in.')
+    const cleanName = name.trim()
+    if (!cleanName) throw new Error('Enter a playlist name.')
+    await fsRenamePlaylist(user.id, playlistId, cleanName)
+  }, [user])
+
   const removeFromPlaylist = useCallback(async (playlistId, trackId) => {
     if (!user) throw new Error('Not logged in.')
     const playlist = playlists.find((p) => p.id === playlistId)
@@ -109,10 +117,10 @@ export function AccountProvider({ children }) {
     user, playlists, authMode, loadingAccount,
     openAuth: setAuthMode, closeAuth: () => setAuthMode(null),
     signUp, logIn, logInWithGoogle, logOut,
-    createPlaylist, addToPlaylist, removeFromPlaylist, deletePlaylist,
+    createPlaylist, renamePlaylist, addToPlaylist, removeFromPlaylist, deletePlaylist,
   }), [user, playlists, authMode, loadingAccount,
        signUp, logIn, logInWithGoogle, logOut,
-       createPlaylist, addToPlaylist, removeFromPlaylist, deletePlaylist])
+       createPlaylist, renamePlaylist, addToPlaylist, removeFromPlaylist, deletePlaylist])
 
   return <AccountContext.Provider value={value}>{children}</AccountContext.Provider>
 }

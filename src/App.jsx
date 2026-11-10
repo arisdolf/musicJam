@@ -58,7 +58,7 @@ function Shell() {
       return <MusicRoom roomCode={roomCode} room={room} updateRoom={updateRoom} connection={connection} members={members} onLeave={leaveRoom} />
     }
     switch (view) {
-      case 'playlists': return <Playlists onPlay={playPlaylist} />
+      case 'playlists': return <Playlists onPlay={playPlaylist} onBrowse={() => navigate('explore')} />
       case 'explore':   return <Explore onAddToRoom={addToRoom} />
       case 'recent':    return <RecentRooms onJoin={joinRoom} />
       case 'settings':  return user ? <Settings /> : null

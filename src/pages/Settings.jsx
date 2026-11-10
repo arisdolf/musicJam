@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { updateProfile, updatePassword, EmailAuthProvider, reauthenticateWithCredential, deleteUser } from 'firebase/auth'
 import { auth } from '../services/firebase'
 import { useAccount } from '../features/account/AccountContext'
-import { User, Lock, LogOut, Trash2, Check } from 'lucide-react'
+import { User, Lock, LogOut, Trash2, Check, Monitor } from 'lucide-react'
 
 export default function Settings() {
   const { user, logOut } = useAccount()
@@ -65,6 +65,12 @@ export default function Settings() {
   return (
     <main className="settings-page">
       <h1>Settings</h1>
+
+      <section className="settings-card appearance-card">
+        <div className="settings-card-header"><Monitor size={18} /><h2>Appearance</h2></div>
+        <p className="settings-desc">Jamroom follows your device appearance automatically. Turn on dark mode in your system settings to use the dark theme here.</p>
+        <div className="appearance-status"><span className="appearance-status-dot" /> Following device settings</div>
+      </section>
 
       {/* ── Profile ── */}
       <section className="settings-card">

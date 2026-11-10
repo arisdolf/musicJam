@@ -1,60 +1,141 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useAccount } from '../features/account/AccountContext'
-import { Plus, Play, Trash2, Music2 } from 'lucide-react'
+import { ArrowLeft, Check, Disc3, ListMusic, Music2, Pencil, Play, Plus, Search, Trash2, X } from 'lucide-react'
 
-export default function Playlists({ onPlay }) {
-  const { user, openAuth, playlists, createPlaylist, removeFromPlaylist, deletePlaylist } = useAccount()
+export default function Playlists({ onPlay, onBrowse }) {
+  const { user, openAuth, playlists, createPlaylist, renamePlaylist, removeFromPlaylist, deletePlaylist } = useAccount()
   const [name, setName] = useState('')
+  const [search, setSearch] = useState('')
+  const [selectedId, setSelectedId] = useState(null)
+  const [editing, setEditing] = useState(false)
+  const [editName, setEditName] = useState('')
   const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const selected = playlists.find((playlist) => playlist.id === selectedId)
+  const visiblePlaylists = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return query ? playlists.filter((playlist) => playlist.name.toLowerCase().includes(query)) : playlists
+  }, [playlists, search])
 
   if (!user) {
-    return <main className="page narrow">
-      <h1>Your playlists</h1>
-      <p className="muted">Sign up to save songs into playlists and listen to them any time.</p>
-      <button className="btn btn-primary" onClick={() => openAuth('signup')}><Music2 size={16} /> Sign up</button>
+    return <main className="page narrow playlist-page">
+      <div className="playlist-page-heading"><span className="page-icon"><ListMusic size={21} /></span><div><h1>Your playlists</h1><p className="muted">Keep your favorite tracks together.</p></div></div>
+      <section className="playlist-empty-state">
+        <Disc3 size={34} />
+        <h2>Make your own music library</h2>
+        <p className="muted">Sign in to create playlists and save tracks from Explore and your rooms.</p>
+        <button className="btn btn-primary" onClick={() => openAuth('signup')}><Music2 size={16} /> Sign up or log in</button>
+      </section>
     </main>
   }
 
   const create = async (event) => {
     event.preventDefault()
-    if (!name.trim()) return
-    try { await createPlaylist(name); setName(''); setError('') } catch (err) { setError(err.message || 'Could not create playlist.') }
+    const cleanName = name.trim()
+    if (!cleanName) return
+    setBusy(true); setError('')
+    try {
+      const id = await createPlaylist(cleanName)
+      setName('')
+      setSelectedId(id)
+    } catch (err) { setError(err.message || 'Could not create playlist.') }
+    finally { setBusy(false) }
   }
 
-  const remove = (playlist) => {
-    if (window.confirm(`Delete "${playlist.name}"?`)) deletePlaylist(playlist.id).catch((err) => setError(err.message || 'Could not delete playlist.'))
+  const remove = async (playlist) => {
+    if (!window.confirm(`Delete “${playlist.name}”? This cannot be undone.`)) return
+    setError('')
+    try {
+      await deletePlaylist(playlist.id)
+      if (selectedId === playlist.id) setSelectedId(null)
+    } catch (err) { setError(err.message || 'Could not delete playlist.') }
   }
 
-  return <main className="page narrow">
-    <h1>Your playlists</h1>
-    <form className="inline-form" onSubmit={create}>
-      <input value={name} onChange={(event) => setName(event.target.value)} placeholder="New playlist name" aria-label="New playlist name" />
-      <button className="btn btn-primary" type="submit" disabled={!name.trim()}><Plus size={16} /> Create</button>
-    </form>
+  const saveName = async (event) => {
+    event.preventDefault()
+    setBusy(true); setError('')
+    try { await renamePlaylist(selected.id, editName); setEditing(false) }
+    catch (err) { setError(err.message || 'Could not rename playlist.') }
+    finally { setBusy(false) }
+  }
 
-    {error && <p className="form-error" role="alert">{error}</p>}
-    {playlists.length === 0
-      ? <p className="empty">No playlists yet. Create one above, or tap ♡ on any song in a room to save it.</p>
-      : playlists.map((playlist) => <section className="playlist" key={playlist.id}>
-          <div className="playlist-head">
-            <div>
-              <h2>{playlist.name}</h2>
-              <small className="muted">{playlist.tracks.length} {playlist.tracks.length === 1 ? 'song' : 'songs'}</small>
-            </div>
-            <div className="row-actions">
-              <button className="btn btn-primary btn-small" disabled={!playlist.tracks.length} onClick={() => onPlay(playlist)}><Play size={14} /> Play</button>
-              <button className="btn btn-small" onClick={() => remove(playlist)}><Trash2 size={14} /> Delete</button>
-            </div>
+  const removeTrack = async (track) => {
+    setError('')
+    try { await removeFromPlaylist(selected.id, track.id) }
+    catch (err) { setError(err.message || 'Could not remove track.') }
+  }
+
+  if (selected) {
+    return <main className="page playlist-page">
+      <button className="btn btn-text playlist-back" onClick={() => { setSelectedId(null); setEditing(false); setError('') }}><ArrowLeft size={16} /> All playlists</button>
+      <section className="playlist-detail-hero">
+        <div className="playlist-cover large" aria-hidden="true">
+          {selected.tracks.slice(0, 4).map((track, index) => <img key={`${track.id}-${index}`} src={track.thumbnail || ''} alt="" />)}
+          {selected.tracks.length === 0 && <Music2 size={34} />}
+        </div>
+        <div className="playlist-detail-copy">
+          <span className="eyebrow">PLAYLIST</span>
+          {editing
+            ? <form className="playlist-rename-form" onSubmit={saveName}>
+                <input value={editName} onChange={(event) => setEditName(event.target.value)} aria-label="Playlist name" maxLength={60} autoFocus />
+                <button className="icon-btn" type="submit" aria-label="Save playlist name" disabled={busy || !editName.trim()}><Check size={17} /></button>
+                <button className="icon-btn" type="button" aria-label="Cancel rename" onClick={() => setEditing(false)}><X size={17} /></button>
+              </form>
+            : <div className="playlist-title-row"><h1>{selected.name}</h1><button className="icon-btn" onClick={() => { setEditName(selected.name); setEditing(true); setError('') }} aria-label="Rename playlist"><Pencil size={16} /></button></div>}
+          <p className="muted">{selected.tracks.length} {selected.tracks.length === 1 ? 'track' : 'tracks'} · Your saved collection</p>
+          <div className="playlist-detail-actions">
+            <button className="btn btn-primary" onClick={() => onPlay(selected)} disabled={!selected.tracks.length}><Play size={16} /> Play playlist</button>
+            <button className="btn" onClick={onBrowse}><Plus size={16} /> Add songs</button>
+            <button className="btn btn-text danger-text" onClick={() => remove(selected)}><Trash2 size={16} /> Delete</button>
           </div>
-          {playlist.tracks.length === 0
-            ? <p className="empty small">This playlist is empty.</p>
-            : <ul className="track-list">
-                {playlist.tracks.map((track) => <li className="track" key={track.id}>
-                  <img src={track.thumbnail} alt="" />
-                  <div className="track-text"><strong>{track.title}</strong><small>{track.artist}</small></div>
-                  <button className="icon-btn" onClick={() => removeFromPlaylist(playlist.id, track.id).catch((err) => setError(err.message || 'Could not remove track.'))} aria-label={`Remove ${track.title}`}><Trash2 size={15} /></button>
-                </li>)}
-              </ul>}
-        </section>)}
+        </div>
+      </section>
+      {error && <p className="form-error" role="alert">{error}</p>}
+      <section className="playlist-tracks-section">
+        <div className="block-head"><h2><ListMusic size={17} /> Songs</h2><span className="muted">{selected.tracks.length}</span></div>
+        {selected.tracks.length === 0
+          ? <div className="playlist-empty-state compact"><Music2 size={28} /><h2>This playlist is empty</h2><p className="muted">Find a song you like and save it here.</p><button className="btn btn-primary btn-small" onClick={onBrowse}><Search size={15} /> Explore songs</button></div>
+          : <ul className="track-list playlist-track-list">
+              {selected.tracks.map((track, index) => <li className="track playlist-track" key={`${track.id}-${index}`}>
+                <span className="playlist-track-number">{String(index + 1).padStart(2, '0')}</span>
+                <img src={track.thumbnail} alt="" loading="lazy" />
+                <div className="track-text"><strong title={track.title}>{track.title}</strong><small>{track.artist}</small></div>
+                <button className="icon-btn" onClick={() => removeTrack(track)} aria-label={`Remove ${track.title}`} title="Remove from playlist"><Trash2 size={16} /></button>
+              </li>)}
+            </ul>}
+      </section>
+    </main>
+  }
+
+  return <main className="page playlist-page">
+    <div className="playlist-page-heading"><span className="page-icon"><ListMusic size={21} /></span><div><h1>Your playlists</h1><p className="muted">Your saved music, all in one place.</p></div></div>
+    <form className="playlist-create-form" onSubmit={create}>
+      <label className="sr-only" htmlFor="new-playlist-name">New playlist name</label>
+      <input id="new-playlist-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Give your playlist a name" maxLength={60} />
+      <button className="btn btn-primary" type="submit" disabled={!name.trim() || busy}><Plus size={16} /> Create playlist</button>
+    </form>
+    {error && <p className="form-error" role="alert">{error}</p>}
+    {playlists.length > 0 && <label className="playlist-search"><Search size={17} /><span className="sr-only">Search playlists</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search your playlists" /></label>}
+    {playlists.length === 0
+      ? <section className="playlist-empty-state"><Disc3 size={34} /><h2>Your library starts here</h2><p className="muted">Create a playlist, then save songs from Explore or your music rooms.</p><button className="btn btn-text" onClick={onBrowse}><Search size={16} /> Explore music</button></section>
+      : visiblePlaylists.length === 0
+        ? <p className="empty">No playlists match “{search}”.</p>
+        : <div className="playlist-grid">
+            {visiblePlaylists.map((playlist) => <article className="playlist-card" key={playlist.id}>
+              <button className="playlist-card-open" onClick={() => { setSelectedId(playlist.id); setError('') }} aria-label={`Open ${playlist.name}`}>
+                <span className="playlist-cover" aria-hidden="true">
+                  {playlist.tracks.slice(0, 4).map((track, index) => <img key={`${track.id}-${index}`} src={track.thumbnail || ''} alt="" loading="lazy" />)}
+                  {playlist.tracks.length === 0 && <Music2 size={28} />}
+                </span>
+                <span className="playlist-card-copy"><strong>{playlist.name}</strong><small>{playlist.tracks.length} {playlist.tracks.length === 1 ? 'track' : 'tracks'}</small></span>
+                <span className="playlist-card-play"><Play size={17} fill="currentColor" /></span>
+              </button>
+              <div className="playlist-card-actions">
+                <button className="btn btn-text btn-small" onClick={() => onPlay(playlist)} disabled={!playlist.tracks.length}><Play size={14} /> Play</button>
+                <button className="icon-btn" onClick={() => remove(playlist)} aria-label={`Delete ${playlist.name}`} title="Delete playlist"><Trash2 size={15} /></button>
+              </div>
+            </article>)}
+          </div>}
   </main>
 }
