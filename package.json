@@ -5,23 +5,21 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "server": "node server/server.js",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "db:migrate": "node server/migrate.js",
-    "start": "node server/migrate.js && node server/server.js"
+    "preview": "vite preview"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "firebase": "^13.2.0",
+    "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^0.468.0",
+    "pg": "^8.16.3",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "express": "^5.1.0",
-    "cors": "^2.8.5",
-    "pg": "^8.16.3",
-    "bcryptjs": "^3.0.2",
-    "jsonwebtoken": "^9.0.2",
-    "ws": "^8.18.3",
-    "lucide-react": "^0.468.0"
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

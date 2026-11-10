@@ -130,6 +130,10 @@ input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px 
 /* ---------- Notices ---------- */
 .notice { margin-top: 28px; padding: 10px 12px; border-radius: 8px; background: #fff6e0; color: #6b5420; font-size: 13px; }
 
+/* ---------- Google sign-in button ---------- */
+.btn-google { display: inline-flex; align-items: center; justify-content: center; gap: 10px; background: var(--bg); border: 1px solid var(--line); font-weight: 600; font-size: 14px; }
+.btn-google:hover:not(:disabled) { background: var(--surface); }
+
 /* ---------- Small screens ---------- */
 @media (max-width: 480px) {
   .page { padding: 24px 16px 48px; }

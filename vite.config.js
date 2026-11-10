@@ -5,10 +5,6 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: '0.0.0.0',
-    proxy: {
-      '/api': 'http://localhost:3001',
-      '/health': 'http://localhost:3001',
-      '/ws': { target: 'ws://localhost:3001', ws: true },
-    },
+    // No proxy needed — all backend calls go directly to Firebase.
   },
 })

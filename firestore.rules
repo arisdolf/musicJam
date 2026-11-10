@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Users: only the owner can read/write their own data ──────────────
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+
+      // Playlists sub-collection: same owner-only rule
+      match /playlists/{playlistId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
+    // ── Rooms: anyone authenticated can read and write ───────────────────
+    // (rooms are collaborative — any user in the room can update state)
+    match /rooms/{roomCode} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

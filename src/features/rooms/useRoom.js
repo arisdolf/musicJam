@@ -1,4 +1,8 @@
+// src/features/rooms/useRoom.js
+// Real-time collaborative rooms via Firestore (replaces WebSocket).
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore'
+import { db } from '../../services/firebase'
 
 const emptyRoom = { queue: [], current: 0, playing: false }
 
@@ -12,66 +16,62 @@ export function createRoomCode() {
 }
 
 export function useRoom(roomCode) {
-  const [room, setRoom] = useState(() => roomCode ? savedRoom(roomCode) : emptyRoom)
+  const [room, setRoom]           = useState(() => roomCode ? savedRoom(roomCode) : emptyRoom)
   const [connection, setConnection] = useState('connecting')
-  const [members, setMembers] = useState(1)
-  const socketRef = useRef(null)
-  const roomRef = useRef(room)
+  const [members, setMembers]     = useState(1)
+  const roomRef                   = useRef(room)
+  const isMineRef                 = useRef(false)   // flag to skip echo-back of our own writes
+
   useEffect(() => { roomRef.current = room }, [room])
 
   useEffect(() => {
     if (!roomCode) return undefined
 
-    // Load this room's saved state whenever the code changes (e.g. playing a playlist).
     const initial = savedRoom(roomCode)
     roomRef.current = initial
     setRoom(initial)
     setConnection('connecting')
-    setMembers(1)
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const socketUrl = import.meta.env.VITE_ROOM_SERVER_URL || `${protocol}//${window.location.host}/ws`
-    const socket = new WebSocket(socketUrl)
-    socketRef.current = socket
-    const storageKey = `jamroom:${roomCode}`
-    const channel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel(storageKey)
+    const docRef = doc(db, 'rooms', roomCode)
 
-    const onMessage = (event) => {
-      const data = JSON.parse(event.data)
-      if (data.type === 'room') {
-        setRoom(data.room)
-        setConnection('connected')
-      }
-      if (data.type === 'members') { setMembers(data.count); setConnection('connected') }
-    }
-    socket.addEventListener('open', () => socket.send(JSON.stringify({ type: 'join', roomCode, room: roomRef.current })))
-    socket.addEventListener('message', onMessage)
-    socket.addEventListener('error', () => setConnection('local'))
-    socket.addEventListener('close', () => setConnection('local'))
+    // Seed the room document if it doesn't exist yet.
+    setDoc(docRef, {
+      queue:     initial.queue.slice(0, 200),
+      current:   Math.max(0, Math.min(Number(initial.current) || 0, initial.queue.length - 1)),
+      playing:   Boolean(initial.playing),
+      updatedAt: serverTimestamp(),
+    }, { merge: true }).catch(console.error)
 
-    if (channel) {
-      channel.addEventListener('message', (event) => setRoom(event.data))
-    }
+    // Real-time listener — acts as the WebSocket "room" message.
+    const unsub = onSnapshot(docRef, (snap) => {
+      setConnection('connected')
+      if (!snap.exists()) return
+      if (isMineRef.current) { isMineRef.current = false; return } // skip our own writes
+      const data = snap.data()
+      const next = { queue: data.queue ?? [], current: data.current ?? 0, playing: data.playing ?? false }
+      roomRef.current = next
+      setRoom(next)
+      try { localStorage.setItem(`jamroom:${roomCode}`, JSON.stringify(next)) } catch { /* noop */ }
+    }, () => setConnection('local'))
 
-    return () => {
-      socket.close()
-      channel?.close()
-      socketRef.current = null
-    }
+    return () => unsub()
   }, [roomCode])
 
   const updateRoom = useCallback((update) => {
     const next = typeof update === 'function' ? update(roomRef.current) : update
     roomRef.current = next
     setRoom(next)
-    try { localStorage.setItem(`jamroom:${roomCode}`, JSON.stringify(next)) } catch { /* Storage can be disabled. */ }
-    if (socketRef.current?.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify({ type: 'update', roomCode, room: next }))
-    } else if (typeof BroadcastChannel !== 'undefined') {
-      const channel = new BroadcastChannel(`jamroom:${roomCode}`)
-      channel.postMessage(next)
-      channel.close()
-    }
+    try { localStorage.setItem(`jamroom:${roomCode}`, JSON.stringify(next)) } catch { /* noop */ }
+
+    // Write to Firestore — all listeners in this room will receive it.
+    const docRef = doc(db, 'rooms', roomCode)
+    isMineRef.current = true
+    setDoc(docRef, {
+      queue:     next.queue.slice(0, 200),
+      current:   Math.max(0, Math.min(next.current, next.queue.length - 1)),
+      playing:   Boolean(next.playing),
+      updatedAt: serverTimestamp(),
+    }).catch(console.error)
   }, [roomCode])
 
   return { room, updateRoom, connection, members }
