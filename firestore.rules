@@ -6,16 +6,15 @@ service cloud.firestore {
     match /users/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
 
-      // Playlists sub-collection: same owner-only rule
       match /playlists/{playlistId} {
         allow read, write: if request.auth != null && request.auth.uid == uid;
       }
     }
 
-    // ── Rooms: anyone authenticated can read and write ───────────────────
-    // (rooms are collaborative — any user in the room can update state)
+    // ── Rooms: open to everyone (guests + logged-in users) ───────────────
+    // Rooms are collaborative and don't contain private data.
     match /rooms/{roomCode} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
   }
 }

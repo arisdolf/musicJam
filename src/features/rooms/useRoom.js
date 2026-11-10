@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '../../services/firebase'
+import { saveRecentRoom } from '../../pages/RecentRooms'
 
 const emptyRoom = { queue: [], current: 0, playing: false }
 
@@ -16,11 +17,11 @@ export function createRoomCode() {
 }
 
 export function useRoom(roomCode) {
-  const [room, setRoom]           = useState(() => roomCode ? savedRoom(roomCode) : emptyRoom)
+  const [room, setRoom]             = useState(() => roomCode ? savedRoom(roomCode) : emptyRoom)
   const [connection, setConnection] = useState('connecting')
-  const [members, setMembers]     = useState(1)
-  const roomRef                   = useRef(room)
-  const isMineRef                 = useRef(false)   // flag to skip echo-back of our own writes
+  const [members, setMembers]       = useState(1)
+  const roomRef                     = useRef(room)
+  const isMineRef                   = useRef(false)
 
   useEffect(() => { roomRef.current = room }, [room])
 
@@ -32,9 +33,11 @@ export function useRoom(roomCode) {
     setRoom(initial)
     setConnection('connecting')
 
+    // Track this room in recent history
+    saveRecentRoom(roomCode)
+
     const docRef = doc(db, 'rooms', roomCode)
 
-    // Seed the room document if it doesn't exist yet.
     setDoc(docRef, {
       queue:     initial.queue.slice(0, 200),
       current:   Math.max(0, Math.min(Number(initial.current) || 0, initial.queue.length - 1)),
@@ -42,11 +45,10 @@ export function useRoom(roomCode) {
       updatedAt: serverTimestamp(),
     }, { merge: true }).catch(console.error)
 
-    // Real-time listener — acts as the WebSocket "room" message.
     const unsub = onSnapshot(docRef, (snap) => {
       setConnection('connected')
       if (!snap.exists()) return
-      if (isMineRef.current) { isMineRef.current = false; return } // skip our own writes
+      if (isMineRef.current) { isMineRef.current = false; return }
       const data = snap.data()
       const next = { queue: data.queue ?? [], current: data.current ?? 0, playing: data.playing ?? false }
       roomRef.current = next
@@ -63,7 +65,6 @@ export function useRoom(roomCode) {
     setRoom(next)
     try { localStorage.setItem(`jamroom:${roomCode}`, JSON.stringify(next)) } catch { /* noop */ }
 
-    // Write to Firestore — all listeners in this room will receive it.
     const docRef = doc(db, 'rooms', roomCode)
     isMineRef.current = true
     setDoc(docRef, {
