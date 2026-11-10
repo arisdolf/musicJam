@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { searchYouTube } from '../services/youtube'
 import AddToPlaylist from './AddToPlaylist'
+import FeedbackModal from './FeedbackModal'
 import { useAccount } from '../features/account/AccountContext'
-import { Play, Pause, SkipForward, Search, Music2, Check, X, Plus } from 'lucide-react'
+import { Play, Pause, SkipForward, Search, Music2, Check, X, Plus, GripVertical, ArrowUp, ArrowDown } from 'lucide-react'
 
 export default function MusicRoom({ roomCode, room, updateRoom, connection, members, onLeave }) {
   const { user, openAuth, createPlaylist } = useAccount()
@@ -12,6 +13,11 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
   const [searchError, setSearchError] = useState('')
   const [copied, setCopied] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saveModalOpen, setSaveModalOpen] = useState(false)
+  const [playlistName, setPlaylistName] = useState('My playlist')
+  const [savingQueue, setSavingQueue] = useState(false)
+  const [feedback, setFeedback] = useState('')
+  const [draggedIndex, setDraggedIndex] = useState(null)
   const [playerReady, setPlayerReady] = useState(false)
   const playerRef = useRef(null)
   const roomRef = useRef(room)
@@ -73,24 +79,42 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
     if (!query.trim()) return undefined
     const controller = new AbortController()
     const timer = setTimeout(async () => {
-      setSearching(true)
+      setSearching(true); setSearchError(''); setResults([])
       try {
         const tracks = await searchYouTube(query.trim(), controller.signal)
         setResults(tracks)
         setSearchError(tracks.length ? '' : 'No songs found. Try another search.')
       } catch (error) {
-        if (error.name !== 'AbortError') setSearchError(error.message)
+        if (error.name !== 'AbortError') setFeedback(error.message)
       } finally { setSearching(false) }
     }, 300)
     return () => { clearTimeout(timer); controller.abort() }
   }, [query])
 
-  const addTrack = (track) => updateRoom((state) => {
-    if (state.queue.some((item) => item.id === track.id)) return state
-    const queue = [...state.queue, track]
-    return { ...state, queue, current: state.queue.length === 0 ? 0 : state.current }
-  })
+  const addTrack = (track) => {
+    updateRoom((state) => {
+      const existingIndex = state.queue.findIndex((item) => item.id === track.id)
+      if (existingIndex >= 0) return { ...state, current: existingIndex, playing: true }
+      const queue = [...state.queue, track]
+      return { ...state, queue, current: queue.length - 1, playing: true }
+    })
+    if (playerReady) playerRef.current?.loadVideoById(track.id)
+  }
   const playTrack = (index) => updateRoom((state) => ({ ...state, current: index, playing: true }))
+  const moveTrack = (from, to) => updateRoom((state) => {
+    if (from < 0 || to < 0 || from >= state.queue.length || to >= state.queue.length || from === to) return state
+    const currentId = state.queue[state.current]?.id
+    const queue = [...state.queue]
+    const [track] = queue.splice(from, 1)
+    queue.splice(to, 0, track)
+    return { ...state, queue, current: queue.findIndex((item) => item.id === currentId) }
+  })
+  const dropTrack = (event, index) => {
+    event.preventDefault()
+    const from = Number(event.dataTransfer.getData('text/plain'))
+    if (Number.isInteger(from)) moveTrack(from, index)
+    setDraggedIndex(null)
+  }
   const removeTrack = (index) => updateRoom((state) => {
     const queue = state.queue.filter((_, itemIndex) => itemIndex !== index)
     const current = queue.length ? Math.min(state.current > index ? state.current - 1 : state.current, queue.length - 1) : 0
@@ -101,15 +125,21 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
 
   const shareCode = async () => {
     try { await navigator.clipboard.writeText(roomCode); setCopied(true); setTimeout(() => setCopied(false), 1600) }
-    catch { window.prompt('Share this room code:', roomCode) }
+    catch { setFeedback(`Copy this room code to share it: ${roomCode}`) }
   }
 
-  const saveQueue = async () => {
+  const saveQueue = async (event) => {
+    event.preventDefault()
     if (!user) { openAuth('signup'); return }
-    const name = window.prompt('Name this playlist', 'My playlist')
-    if (!name?.trim()) return
-    try { await createPlaylist(name, room.queue); setSaved(true); setTimeout(() => setSaved(false), 2000) }
-    catch (error) { window.alert(error.message || 'Could not save playlist.') }
+    if (!playlistName.trim()) return
+    setSavingQueue(true)
+    try {
+      await createPlaylist(playlistName.trim(), room.queue)
+      setSaveModalOpen(false)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (error) { setFeedback(error.message || 'Could not save playlist.') }
+    finally { setSavingQueue(false) }
   }
 
   const status = connection === 'connected' ? 'Live' : connection === 'local' ? 'Offline' : 'Connecting'
@@ -160,21 +190,46 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
     <section className="block">
       <div className="block-head">
         <h2>Up next <small className="muted">{room.queue.length} {room.queue.length === 1 ? 'song' : 'songs'}</small></h2>
-        {room.queue.length > 0 && <button className="btn btn-small" onClick={saveQueue}>{saved ? <><Check size={14} /> Saved</> : <><Music2 size={14} /> Save as playlist</>}</button>}
+        {room.queue.length > 0 && <button className="btn btn-small" onClick={() => { if (!user) { openAuth('signup'); return } setSaveModalOpen(true) }}>{saved ? <><Check size={14} /> Saved</> : <><Music2 size={14} /> Save as playlist</>}</button>}
       </div>
       {room.queue.length === 0
         ? <p className="empty">Songs you add will show up here.</p>
-        : <ul className="track-list">
-            {room.queue.map((track, index) => <li className={`track ${index === room.current ? 'active' : ''}`} key={`${track.id}-${index}`}>
+        : <ul className="track-list queue-list">
+            {room.queue.map((track, index) => <li
+              className={`track queue-track ${index === room.current ? 'active' : ''}${draggedIndex === index ? ' dragging' : ''}`}
+              key={`${track.id}-${index}`}
+              draggable
+              onDragStart={(event) => { setDraggedIndex(index); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', String(index)) }}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => dropTrack(event, index)}
+              onDragEnd={() => setDraggedIndex(null)}
+            >
+              <span className="queue-drag-handle" aria-hidden="true" title="Drag to reorder"><GripVertical size={17} /></span>
               <button className="track-play" onClick={() => playTrack(index)} aria-label={`Play ${track.title}`}>{index === room.current && room.playing ? <Pause size={12} /> : <Play size={12} />}</button>
               <img src={track.thumbnail} alt="" />
               <button className="track-text as-button" onClick={() => playTrack(index)}><strong>{track.title}</strong><small>{track.artist}</small></button>
+              <span className="queue-reorder-controls">
+                <button className="queue-move-btn" onClick={() => moveTrack(index, index - 1)} disabled={index === 0} aria-label={`Move ${track.title} earlier`} title="Move earlier"><ArrowUp size={13} /></button>
+                <button className="queue-move-btn" onClick={() => moveTrack(index, index + 1)} disabled={index === room.queue.length - 1} aria-label={`Move ${track.title} later`} title="Move later"><ArrowDown size={13} /></button>
+              </span>
               <AddToPlaylist track={track} />
               <button className="icon-btn" aria-label={`Remove ${track.title}`} onClick={() => removeTrack(index)}><X size={16} /></button>
             </li>)}
           </ul>}
     </section>
 
-    {connection === 'local' && <p className="notice">Room server is offline, so this room only works in tabs on this device. Start the room server to sync with other devices.</p>}
+    {saveModalOpen && <div className="overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setSaveModalOpen(false) }}>
+      <form className="modal" onSubmit={saveQueue} role="dialog" aria-modal="true" aria-labelledby="save-queue-title">
+        <button type="button" className="modal-close" onClick={() => setSaveModalOpen(false)} aria-label="Close"><X size={19} /></button>
+        <div className="auth-icon"><Music2 size={20} /></div>
+        <h2 id="save-queue-title">Save this queue</h2>
+        <p className="muted">Create a playlist with these {room.queue.length} songs.</p>
+        <label className="field">Playlist name
+          <input value={playlistName} onChange={(event) => setPlaylistName(event.target.value)} maxLength={60} autoFocus />
+        </label>
+        <button className="btn btn-primary btn-block" type="submit" disabled={savingQueue || !playlistName.trim()}>{savingQueue ? 'Saving…' : 'Save playlist'}</button>
+      </form>
+    </div>}
+    <FeedbackModal title="Something went wrong" message={feedback} onClose={() => setFeedback('')} />
   </main>
 }

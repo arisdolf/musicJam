@@ -1,8 +1,9 @@
 // Browse genres and popular tracks from YouTube.
 import { useEffect, useState } from 'react'
-import { getPopularMusic, searchYouTube } from '../services/youtube'
+import { getPopularMusic, searchPopularSongs } from '../services/youtube'
 import AddToPlaylist from '../components/AddToPlaylist'
-import { Compass, Plus, Loader, Flame, Headphones, PartyPopper, Dumbbell, Cloud, Sun, Guitar, Piano, Globe2, Mic2, Disc3, Waves, Eye } from 'lucide-react'
+import FeedbackModal from '../components/FeedbackModal'
+import { Compass, Plus, Loader, Flame, Headphones, PartyPopper, Dumbbell, Cloud, Sun, Guitar, Piano, Globe2, Mic2, Disc3, Waves, Eye, Music2 } from 'lucide-react'
 
 const CATEGORIES = [
   { label: 'Trending', icon: Flame, query: 'trending music' },
@@ -23,29 +24,38 @@ export default function Explore({ onAddToRoom }) {
   const [active, setActive]     = useState(null)
   const [results, setResults]   = useState([])
   const [loading, setLoading]   = useState(false)
-  const [error, setError]       = useState('')
+  const [feedback, setFeedback] = useState('')
   const [popular, setPopular]   = useState([])
-  const [popularError, setPopularError] = useState('')
   const [popularLoading, setPopularLoading] = useState(true)
 
   useEffect(() => {
     const controller = new AbortController()
     getPopularMusic('PH', controller.signal)
       .then(setPopular)
-      .catch((err) => { if (err.name !== 'AbortError') setPopularError(err.message) })
+      .catch((err) => { if (err.name !== 'AbortError') setFeedback(err.message) })
       .finally(() => { if (!controller.signal.aborted) setPopularLoading(false) })
     return () => controller.abort()
   }, [])
 
-  const pick = async (cat) => {
-    if (active?.label === cat.label) { setActive(null); setResults([]); return }
-    setActive(cat); setLoading(true); setError(''); setResults([])
-    try {
-      const tracks = await searchYouTube(cat.query)
-      setResults(tracks)
-    } catch (err) { setError(err.message) }
-    finally { setLoading(false) }
+  useEffect(() => {
+    if (!active) { setResults([]); setLoading(false); return undefined }
+    const controller = new AbortController()
+    setLoading(true)
+    setResults([])
+    searchPopularSongs(active.query, controller.signal)
+      .then(setResults)
+      .catch((err) => { if (err.name !== 'AbortError') setFeedback(err.message) })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
+    return () => controller.abort()
+  }, [active])
+
+  const pick = (category) => {
+    setFeedback('')
+    setActive((current) => current?.label === category.label ? null : category)
   }
+
+  const visibleTracks = active ? results : popular
+  const visibleLoading = active ? loading : popularLoading
 
   return (
     <main className="explore-page">
@@ -73,14 +83,13 @@ export default function Explore({ onAddToRoom }) {
 
       <section className="popular-section" aria-labelledby="popular-title">
         <div className="popular-heading">
-          <div><span className="eyebrow">YOUTUBE MUSIC CHART</span><h2 id="popular-title">Popular in the Philippines</h2></div>
-          <span className="popular-heading-icon"><Flame size={18} /></span>
+          <div><span className="eyebrow">{active ? 'TOP 25 · MOST VIEWED' : 'YOUTUBE MUSIC CHART'}</span><h2 id="popular-title">{active ? `Popular ${active.label} songs` : 'Popular in the Philippines'}</h2></div>
+          <span className="popular-heading-icon">{active ? <active.icon size={18} /> : <Flame size={18} />}</span>
         </div>
-        <p className="muted popular-subtitle">Songs people are watching right now.</p>
-        {popularLoading && <div className="explore-loading"><Loader size={18} className="spin" /> Loading popular songs…</div>}
-        {popularError && <p className="form-error" role="status">{popularError}</p>}
-        {!popularLoading && popular.length > 0 && <ul className="track-list popular-track-list">
-          {popular.map((track, index) => (
+        <p className="muted popular-subtitle">{active ? 'Ranked by views. Only playable music videos are shown.' : 'Songs people are watching right now.'}</p>
+        {visibleLoading && <div className="explore-loading"><Loader size={18} className="spin" /> Finding playable songs…</div>}
+        {!visibleLoading && visibleTracks.length > 0 && <ul className="track-list popular-track-list">
+          {visibleTracks.map((track, index) => (
             <li className="track" key={track.id}>
               <span className="popular-rank">{String(index + 1).padStart(2, '0')}</span>
               <img src={track.thumbnail} alt="" loading="lazy" />
@@ -91,35 +100,9 @@ export default function Explore({ onAddToRoom }) {
             </li>
           ))}
         </ul>}
+        {!visibleLoading && !visibleTracks.length && <div className="empty-result-card"><Music2 size={22} /><span>No playable songs found. Try another genre.</span></div>}
       </section>
-
-      {loading && (
-        <div className="explore-loading"><Loader size={20} className="spin" /> Loading…</div>
-      )}
-      {error && <p className="form-error">{error}</p>}
-
-      {results.length > 0 && (
-        <div className="explore-results">
-          <h2 className="explore-results-title">{active?.label}</h2>
-          <ul className="track-list">
-            {results.map(track => (
-              <li className="track" key={track.id}>
-                <img src={track.thumbnail} alt="" loading="lazy" />
-                <div className="track-text">
-                  <strong>{track.title}</strong>
-                  <small>{track.artist}</small>
-                </div>
-                <AddToPlaylist track={track} />
-                {onAddToRoom && (
-                  <button className="icon-btn add-btn" onClick={() => onAddToRoom(track)} title="Add to current room" aria-label={`Add ${track.title} to current room`}>
-                    <Plus size={17} />
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <FeedbackModal title="Could not load music" message={feedback} onClose={() => setFeedback('')} />
     </main>
   )
 }

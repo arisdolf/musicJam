@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAccount } from '../features/account/AccountContext'
 import { Heart, Check, Plus } from 'lucide-react'
+import FeedbackModal from './FeedbackModal'
 
 export default function AddToPlaylist({ track }) {
   const { user, openAuth, playlists, createPlaylist, addToPlaylist } = useAccount()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [status, setStatus] = useState('')
+  const [feedback, setFeedback] = useState('')
   const [busy, setBusy] = useState(false)
   const ref = useRef(null)
   const buttonRef = useRef(null)
@@ -42,7 +44,7 @@ export default function AddToPlaylist({ track }) {
     try {
       await addToPlaylist(playlist.id, track)
       setStatus(`Added to ${playlist.name}`)
-    } catch (error) { setStatus(error.message || 'Could not save this track.') }
+    } catch (error) { setFeedback(error.message || 'Could not save this track.') }
     finally { setBusy(false) }
   }
 
@@ -54,7 +56,7 @@ export default function AddToPlaylist({ track }) {
       await createPlaylist(name.trim(), [track])
       setName('')
       setStatus('Playlist created and song saved')
-    } catch (error) { setStatus(error.message || 'Could not save this track.') }
+    } catch (error) { setFeedback(error.message || 'Could not save this track.') }
     finally { setBusy(false) }
   }
 
@@ -75,6 +77,7 @@ export default function AddToPlaylist({ track }) {
       </form>
       {status && <p className="popover-status" role="status">{status}</p>}
     </div>}
+    <FeedbackModal title="Could not save this song" message={feedback} onClose={() => setFeedback('')} />
   </div>
 }
 

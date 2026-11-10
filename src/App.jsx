@@ -1,13 +1,13 @@
 import { useState, useCallback } from 'react'
 import { AccountProvider } from './features/account/AccountContext'
-import { createRoomCode, useRoom } from './features/rooms/useRoom'
+import { useRoom } from './features/rooms/useRoom'
 import Topbar from './components/Topbar'
 import Sidenav from './components/Sidenav'
 import BottomNav from './components/BottomNav'
 import AuthModal from './components/AuthModal'
 import JoinRoom from './components/JoinRoom'
 import MusicRoom from './components/MusicRoom'
-import Playlists from './components/Playlists'
+import Playlists from './pages/Playlists'
 import Explore from './pages/Explore'
 import RecentRooms from './pages/RecentRooms'
 import Settings from './pages/Settings'
@@ -39,17 +39,13 @@ function Shell() {
     setView(id)
   }, [roomCode])
 
-  const playPlaylist = (playlist) => {
-    const code = createRoomCode()
-    try { localStorage.setItem(`jamroom:${code}`, JSON.stringify({ queue: playlist.tracks, current: 0, playing: false })) } catch { /* noop */ }
-    joinRoom(code)
-  }
-
   // Add a track directly from Explore into the active room
   const addToRoom = roomCode
     ? (track) => updateRoom(state => {
-        if (state.queue.some(t => t.id === track.id)) return state
-        return { ...state, queue: [...state.queue, track] }
+        const existingIndex = state.queue.findIndex(t => t.id === track.id)
+        if (existingIndex >= 0) return { ...state, current: existingIndex, playing: true }
+        const queue = [...state.queue, track]
+        return { ...state, queue, current: queue.length - 1, playing: true }
       })
     : null
 
@@ -58,7 +54,7 @@ function Shell() {
       return <MusicRoom roomCode={roomCode} room={room} updateRoom={updateRoom} connection={connection} members={members} onLeave={leaveRoom} />
     }
     switch (view) {
-      case 'playlists': return <Playlists onPlay={playPlaylist} onBrowse={() => navigate('explore')} />
+      case 'playlists': return <Playlists onBrowse={() => navigate('explore')} />
       case 'explore':   return <Explore onAddToRoom={addToRoom} />
       case 'recent':    return <RecentRooms onJoin={joinRoom} />
       case 'settings':  return user ? <Settings /> : null
