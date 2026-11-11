@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { AccountProvider } from './features/account/AccountContext'
 import { PlaybackProvider, usePlayback } from './features/playback/PlaybackContext'
 import { useRoom } from './features/rooms/useRoom'
@@ -33,12 +33,25 @@ function Shell() {
   const [roomCode, setRoomCode]   = useState(() => new URLSearchParams(window.location.search).get('room')?.toUpperCase() || '')
   const [navOpen, setNavOpen]     = useState(false)
   const [queueFly, setQueueFly]   = useState(null)
+  const [routeFallback, setRouteFallback] = useState(false)
   const queueFlyCounter = useRef(0)
+  const routeFallbackTimer = useRef(null)
 
   const { room, updateRoom, connection, members } = useRoom(roomCode)
   const roomQueue = room.queue
   const roomCurrent = room.current
   const roomPlaying = room.playing
+
+  const transitionRoute = useCallback((update) => {
+    const mode = withViewTransition(update)
+    window.clearTimeout(routeFallbackTimer.current)
+    if (mode === 'fallback') {
+      setRouteFallback(true)
+      routeFallbackTimer.current = window.setTimeout(() => setRouteFallback(false), 260)
+    } else setRouteFallback(false)
+  }, [])
+
+  useEffect(() => () => window.clearTimeout(routeFallbackTimer.current), [])
 
   const setUrlRoom = useCallback((code) => {
     const url = new URL(window.location.href)
@@ -47,13 +60,13 @@ function Shell() {
     setRoomCode(code)
   }, [])
 
-  const joinRoom = useCallback((code) => withViewTransition(() => {
+  const joinRoom = useCallback((code) => transitionRoute(() => {
     setView('home')
     setUrlRoom(code)
-  }), [setUrlRoom])
+  }), [setUrlRoom, transitionRoute])
   const leaveRoom = useCallback(() => {
     if (!roomQueue.length) {
-      withViewTransition(() => setUrlRoom(''))
+      transitionRoute(() => setUrlRoom(''))
       return
     }
     const queue = [...roomQueue]
@@ -61,7 +74,7 @@ function Shell() {
       if (!queue.some((item) => item.id === track.id)) queue.push(track)
     }
     const currentTrackId = roomQueue[roomCurrent]?.id
-    withViewTransition(() => {
+    transitionRoute(() => {
       updateLocalPlayback({
         queue,
         current: Math.max(0, queue.findIndex((item) => item.id === currentTrackId)),
@@ -69,12 +82,12 @@ function Shell() {
       })
       setUrlRoom('')
     })
-  }, [updateLocalPlayback, localPlaybackState.queue, roomQueue, roomCurrent, roomPlaying, setUrlRoom])
+  }, [updateLocalPlayback, localPlaybackState.queue, roomQueue, roomCurrent, roomPlaying, setUrlRoom, transitionRoute])
 
   const navigate = useCallback((id) => {
     if (id === view) return
-    withViewTransition(() => setView(id))
-  }, [view])
+    transitionRoute(() => setView(id))
+  }, [view, transitionRoute])
 
   const roomPlaybackActive = Boolean(roomCode && roomQueue.length)
   const playbackState = roomPlaybackActive ? room : localPlaybackState
@@ -167,7 +180,7 @@ function Shell() {
         <Topbar onMenuOpen={() => setNavOpen(true)} />
         <PersistentPlayer playback={playbackState} onPlaybackChange={updateActivePlayback} />
         <QueueFly motion={queueFly} onComplete={completeQueueFly} />
-        <div className="app-body">
+        <div className={`app-body${routeFallback ? ' route-fallback' : ''}`}>
           {renderContent()}
         </div>
         <BottomNav view={activeView} onNavigate={navigate} />

@@ -4,12 +4,18 @@ export function withViewTransition(update) {
   const reducedMotion = typeof window !== 'undefined'
     && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
-  if (typeof document === 'undefined' || typeof document.startViewTransition !== 'function' || reducedMotion) {
+  if (reducedMotion) {
     update()
-    return
+    return 'reduced'
+  }
+
+  if (typeof document === 'undefined' || typeof document.startViewTransition !== 'function') {
+    update()
+    return 'fallback'
   }
 
   document.startViewTransition(() => flushSync(update))
+  return 'native'
 }
 
 export function layoutTransitionName(id) {
