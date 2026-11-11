@@ -6,16 +6,15 @@ export function withViewTransition(update) {
 
   if (reducedMotion) {
     update()
-    return 'reduced'
+    return
   }
 
   if (typeof document === 'undefined' || typeof document.startViewTransition !== 'function') {
     update()
-    return 'fallback'
+    return
   }
 
   document.startViewTransition(() => flushSync(update))
-  return 'native'
 }
 
 export function layoutTransitionName(id) {
