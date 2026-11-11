@@ -35,5 +35,7 @@ Passwords are hashed with bcrypt. API requests for playlists require a signed be
 ## Notes
 
 - YouTube search requires a Google Cloud API key with YouTube Data API v3 enabled. Restrict the key to your deployed website referrer and API usage.
+- Song search checks LRCLIB and shows videos only when matching timestamped lyrics are available. The room displays and follows those lyric lines using the YouTube player's current playback time; no LRCLIB API key is needed.
+- One app-level player stays mounted across in-app pages. Its queue is available from the player controls and is saved in browser storage; media notification controls are enabled where the browser supports the Media Session API.
 - Each listener has their own YouTube player. Mobile browsers may require a local tap before playback due to autoplay restrictions.
 - The API bearer token is stored in browser localStorage for this starter implementation; use HTTPS in production and avoid adding untrusted scripts. Existing browser-only accounts and playlists are not migrated automatically. They remain in the old browser's localStorage; export or recreate anything important before switching.

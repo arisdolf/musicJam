@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useAccount } from '../features/account/AccountContext'
-import { ArrowLeft, Check, Disc3, ListMusic, Music2, Pencil, Play, Plus, Search, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Check, Disc3, ListMusic, Music2, Pencil, Play, Plus, Search, Trash2, X, ListPlus } from 'lucide-react'
 import FeedbackModal from '../components/FeedbackModal'
 import ConfirmModal from '../components/ConfirmModal'
-import PlaylistPlayer from '../features/playlists/PlaylistPlayer'
+import { layoutTransitionName, withViewTransition } from '../utils/viewTransitions'
 
-export default function Playlists({ onBrowse }) {
+export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
   const { user, openAuth, playlists, createPlaylist, renamePlaylist, removeFromPlaylist, deletePlaylist } = useAccount()
   const [name, setName] = useState('')
   const [search, setSearch] = useState('')
@@ -18,8 +18,6 @@ export default function Playlists({ onBrowse }) {
   const [deleteTarget, setDeleteTarget] = useState(null)
 
   const selected = playlists.find((playlist) => playlist.id === selectedId)
-  const currentTrackIndex = selected?.tracks.findIndex((track) => track.id === currentTrackId) ?? -1
-  const currentTrack = currentTrackIndex >= 0 ? selected.tracks[currentTrackIndex] : null
   const visiblePlaylists = useMemo(() => {
     const query = search.trim().toLowerCase()
     return query ? playlists.filter((playlist) => playlist.name.toLowerCase().includes(query)) : playlists
@@ -81,13 +79,30 @@ export default function Playlists({ onBrowse }) {
     catch (err) { setError(err.message || 'Could not remove track.') }
   }
 
-  const playAt = (index) => setCurrentTrackId(selected?.tracks[index]?.id || null)
+  const playAt = (index) => {
+    if (!selected?.tracks[index]) return
+    setCurrentTrackId(selected.tracks[index].id)
+    onPlayTracks(selected.tracks, index)
+  }
+
+  const openPlaylist = (playlist, playFirst = false) => withViewTransition(() => {
+    setSelectedId(playlist.id)
+    setCurrentTrackId(playFirst ? playlist.tracks[0]?.id || null : null)
+    setError('')
+  })
+
+  const showPlaylists = () => withViewTransition(() => {
+    setSelectedId(null)
+    setCurrentTrackId(null)
+    setEditing(false)
+    setError('')
+  })
 
   if (selected) {
     return <main className="page playlist-page">
-      <button className="btn btn-text playlist-back" onClick={() => { setSelectedId(null); setCurrentTrackId(null); setEditing(false); setError('') }}><ArrowLeft size={16} /> All playlists</button>
+      <button className="btn btn-text playlist-back" onClick={showPlaylists}><ArrowLeft size={16} /> All playlists</button>
       <section className="playlist-detail-hero">
-        <div className="playlist-cover large" aria-hidden="true">
+        <div className="playlist-cover large" style={{ viewTransitionName: layoutTransitionName(selected.id) }} aria-hidden="true">
           {selected.tracks.slice(0, 4).map((track, index) => <img key={`${track.id}-${index}`} src={track.thumbnail || ''} alt="" />)}
           {selected.tracks.length === 0 && <Music2 size={34} />}
         </div>
@@ -108,13 +123,6 @@ export default function Playlists({ onBrowse }) {
           </div>
         </div>
       </section>
-      {currentTrack && <PlaylistPlayer
-        track={currentTrack}
-        position={currentTrackIndex}
-        count={selected.tracks.length}
-        onPrevious={() => playAt(currentTrackIndex - 1)}
-        onNext={() => playAt(currentTrackIndex + 1)}
-      />}
       <section className="playlist-tracks-section">
         <div className="block-head"><h2><ListMusic size={17} /> Songs</h2><span className="muted">{selected.tracks.length}</span></div>
         {selected.tracks.length === 0
@@ -124,6 +132,7 @@ export default function Playlists({ onBrowse }) {
                 <button className={`track-play ${track.id === currentTrackId ? 'is-selected' : ''}`} onClick={() => playAt(index)} aria-label={`Play ${track.title}`} title="Play this song"><Play size={15} fill="currentColor" /></button>
                 <img src={track.thumbnail} alt="" loading="lazy" />
                 <div className="track-text"><strong title={track.title}>{track.title}</strong><small>{track.artist}</small></div>
+                <button className="icon-btn playlist-add-queue" onClick={(event) => onQueueTrack(track, event.currentTarget)} aria-label={`Add ${track.title} to queue`} title="Add to queue"><ListPlus size={16} /></button>
                 <button className="icon-btn" onClick={() => removeTrack(track)} aria-label={`Remove ${track.title}`} title="Remove from playlist"><Trash2 size={16} /></button>
               </li>)}
             </ul>}
@@ -149,8 +158,8 @@ export default function Playlists({ onBrowse }) {
         ? <p className="empty">No playlists match “{search}”.</p>
         : <div className="playlist-grid">
             {visiblePlaylists.map((playlist) => <article className="playlist-card" key={playlist.id}>
-                <button className="playlist-card-open" onClick={() => { setSelectedId(playlist.id); setCurrentTrackId(null); setError('') }} aria-label={`Open ${playlist.name}`}>
-                <span className="playlist-cover" aria-hidden="true">
+                <button className="playlist-card-open" onClick={() => openPlaylist(playlist)} aria-label={`Open ${playlist.name}`}>
+                <span className="playlist-cover" style={{ viewTransitionName: layoutTransitionName(playlist.id) }} aria-hidden="true">
                   {playlist.tracks.slice(0, 4).map((track, index) => <img key={`${track.id}-${index}`} src={track.thumbnail || ''} alt="" loading="lazy" />)}
                   {playlist.tracks.length === 0 && <Music2 size={28} />}
                 </span>
@@ -158,7 +167,10 @@ export default function Playlists({ onBrowse }) {
                 <span className="playlist-card-play"><Play size={17} fill="currentColor" /></span>
               </button>
               <div className="playlist-card-actions">
-                <button className="btn btn-text btn-small" onClick={() => { setSelectedId(playlist.id); setCurrentTrackId(playlist.tracks[0]?.id || null); setError('') }} disabled={!playlist.tracks.length}><Play size={14} /> Play</button>
+                <button className="btn btn-text btn-small" onClick={() => {
+                  openPlaylist(playlist, true)
+                  onPlayTracks(playlist.tracks, 0)
+                }} disabled={!playlist.tracks.length}><Play size={14} /> Play</button>
                 <button className="icon-btn" onClick={() => remove(playlist)} aria-label={`Delete ${playlist.name}`} title="Delete playlist"><Trash2 size={15} /></button>
               </div>
             </article>)}

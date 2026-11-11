@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { getPopularMusic, searchPopularSongs } from '../services/youtube'
 import AddToPlaylist from '../components/AddToPlaylist'
 import FeedbackModal from '../components/FeedbackModal'
-import { Compass, Plus, Loader, Flame, Headphones, PartyPopper, Dumbbell, Cloud, Sun, Guitar, Piano, Globe2, Mic2, Disc3, Waves, Eye, Music2 } from 'lucide-react'
+import { Compass, Plus, Play, Loader, Flame, Headphones, PartyPopper, Dumbbell, Cloud, Sun, Guitar, Piano, Globe2, Mic2, Disc3, Waves, Eye, Music2 } from 'lucide-react'
 
 const CATEGORIES = [
   { label: 'Trending', icon: Flame, query: 'trending music' },
@@ -20,10 +20,9 @@ const CATEGORIES = [
   { label: 'Jazz', icon: Cloud, query: 'smooth jazz playlist' },
 ]
 
-export default function Explore({ onAddToRoom }) {
+export default function Explore({ onPlayTrack, onQueueTrack }) {
   const [active, setActive]     = useState(null)
-  const [results, setResults]   = useState([])
-  const [loading, setLoading]   = useState(false)
+  const [searchState, setSearchState] = useState({ label: '', results: [] })
   const [feedback, setFeedback] = useState('')
   const [popular, setPopular]   = useState([])
   const [popularLoading, setPopularLoading] = useState(true)
@@ -38,14 +37,11 @@ export default function Explore({ onAddToRoom }) {
   }, [])
 
   useEffect(() => {
-    if (!active) { setResults([]); setLoading(false); return undefined }
+    if (!active) return undefined
     const controller = new AbortController()
-    setLoading(true)
-    setResults([])
     searchPopularSongs(active.query, controller.signal)
-      .then(setResults)
+      .then((tracks) => { if (!controller.signal.aborted) setSearchState({ label: active.label, results: tracks }) })
       .catch((err) => { if (err.name !== 'AbortError') setFeedback(err.message) })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
   }, [active])
 
@@ -54,8 +50,9 @@ export default function Explore({ onAddToRoom }) {
     setActive((current) => current?.label === category.label ? null : category)
   }
 
-  const visibleTracks = active ? results : popular
-  const visibleLoading = active ? loading : popularLoading
+  const searchMatches = active && searchState.label === active.label
+  const visibleTracks = active ? (searchMatches ? searchState.results : []) : popular
+  const visibleLoading = active ? !searchMatches : popularLoading
 
   return (
     <main className="explore-page">
@@ -86,7 +83,7 @@ export default function Explore({ onAddToRoom }) {
           <div><span className="eyebrow">{active ? 'TOP 25 · MOST VIEWED' : 'YOUTUBE MUSIC CHART'}</span><h2 id="popular-title">{active ? `Popular ${active.label} songs` : 'Popular in the Philippines'}</h2></div>
           <span className="popular-heading-icon">{active ? <active.icon size={18} /> : <Flame size={18} />}</span>
         </div>
-        <p className="muted popular-subtitle">{active ? 'Ranked by views. Only playable music videos are shown.' : 'Songs people are watching right now.'}</p>
+        <p className="muted popular-subtitle">{active ? 'Ranked by views. Videos with synced lyrics are shown.' : 'Songs people are watching right now.'}</p>
         {visibleLoading && <div className="explore-loading"><Loader size={18} className="spin" /> Finding playable songs…</div>}
         {!visibleLoading && visibleTracks.length > 0 && <ul className="track-list popular-track-list">
           {visibleTracks.map((track, index) => (
@@ -96,11 +93,12 @@ export default function Explore({ onAddToRoom }) {
               <div className="track-text"><strong title={track.title}>{track.title}</strong><small>{track.artist}</small></div>
               <span className="popular-views" title="YouTube views"><Eye size={13} /> {formatViews(track.views)}</span>
               <AddToPlaylist track={track} />
-              {onAddToRoom && <button className="icon-btn add-btn" onClick={() => onAddToRoom(track)} title="Add to current room" aria-label={`Add ${track.title} to current room`}><Plus size={17} /></button>}
+              <button className="icon-btn" onClick={() => onPlayTrack(track)} title="Play now" aria-label={`Play ${track.title}`}><Play size={16} fill="currentColor" /></button>
+              <button className="icon-btn add-btn" onClick={(event) => onQueueTrack(track, event.currentTarget)} title="Add to queue" aria-label={`Add ${track.title} to queue`}><Plus size={17} /></button>
             </li>
           ))}
         </ul>}
-        {!visibleLoading && !visibleTracks.length && <div className="empty-result-card"><Music2 size={22} /><span>No playable songs found. Try another genre.</span></div>}
+        {!visibleLoading && !visibleTracks.length && <div className="empty-result-card"><Music2 size={22} /><span>{active ? 'No songs with synced lyrics found. Try another genre.' : 'No playable songs found. Try again later.'}</span></div>}
       </section>
       <FeedbackModal title="Could not load music" message={feedback} onClose={() => setFeedback('')} />
     </main>

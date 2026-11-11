@@ -1,14 +1,16 @@
+import { findLyricsMatch, searchSyncedLyrics } from './lyrics'
+
 const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY
 
 export async function searchYouTube(query, signal) {
-  return searchMusic(query, { signal, limit: 8, order: 'relevance' })
+  return searchMusic(query, { signal, limit: 8, order: 'relevance', requireSyncedLyrics: true })
 }
 
 export async function searchPopularSongs(query, signal) {
-  return searchMusic(query, { signal, limit: 25, order: 'viewCount' })
+  return searchMusic(query, { signal, limit: 25, order: 'viewCount', requireSyncedLyrics: true })
 }
 
-async function searchMusic(query, { signal, limit, order }) {
+async function searchMusic(query, { signal, limit, order, requireSyncedLyrics }) {
   if (!apiKey) throw new Error('YouTube search needs a VITE_YOUTUBE_API_KEY in .env.')
   const params = new URLSearchParams({
     part: 'snippet', type: 'video', videoCategoryId: '10',
@@ -31,12 +33,23 @@ async function searchMusic(query, { signal, limit, order }) {
     .filter((item) => item.snippet?.categoryId === '10' && item.status?.embeddable && item.status?.privacyStatus === 'public' && isAvailableInRegion(item.contentDetails, 'PH'))
     .map((item) => item.id))
 
-  return candidates.filter(({ id }) => playableIds.has(id.videoId)).slice(0, limit).map(({ id, snippet }) => ({
+  const playableTracks = candidates.filter(({ id }) => playableIds.has(id.videoId)).map(({ id, snippet }) => ({
     id: id.videoId,
     title: snippet.title,
     artist: snippet.channelTitle,
     thumbnail: snippet.thumbnails?.medium?.url || `https://i.ytimg.com/vi/${id.videoId}/mqdefault.jpg`,
   }))
+
+  if (!requireSyncedLyrics || !playableTracks.length) return playableTracks.slice(0, limit)
+
+  const lyricRecords = await searchSyncedLyrics(query, signal)
+  return playableTracks
+    .map((track) => {
+      const lyrics = findLyricsMatch(track, lyricRecords)
+      return lyrics ? { ...track, lyricsId: lyrics.id } : null
+    })
+    .filter(Boolean)
+    .slice(0, limit)
 }
 
 export async function getPopularMusic(regionCode = 'PH', signal) {
