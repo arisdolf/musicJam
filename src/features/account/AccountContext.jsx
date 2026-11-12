@@ -19,6 +19,12 @@ import {
   removeTrackFromPlaylist,
 } from '../../services/firestore'
 
+const pickTrack = (t) => ({
+  id: t.id, title: t.title, artist: t.artist, thumbnail: t.thumbnail || null,
+  ...(t.duration ? { duration: t.duration } : {}),
+  ...(t.lyricsId ? { lyricsId: t.lyricsId } : {}),
+})
+
 const AccountContext = createContext(null)
 export const useAccount = () => useContext(AccountContext)
 

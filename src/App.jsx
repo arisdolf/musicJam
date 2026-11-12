@@ -16,7 +16,7 @@ import PersistentPlayer from './components/PersistentPlayer'
 import QueueFly from './components/QueueFly'
 import { useAccount } from './features/account/AccountContext'
 import { withViewTransition } from './utils/viewTransitions'
-import './App.css'
+import ErrorBoundary from './components/ErrorBoundary'
 
 // ── Inner shell (needs AccountContext) ────────────────────────────────────────
 function Shell() {
@@ -47,34 +47,32 @@ function Shell() {
     setRoomCode(code)
   }, [])
 
-  const joinRoom = useCallback((code) => withViewTransition(() => {
-    setView('home')
-    setUrlRoom(code)
-  }), [setUrlRoom])
-  const leaveRoom = useCallback(() => {
-    if (!roomQueue.length) {
-      withViewTransition(() => setUrlRoom(''))
-      return
-    }
-    const queue = [...roomQueue]
-    for (const track of localPlaybackState.queue) {
-      if (!queue.some((item) => item.id === track.id)) queue.push(track)
-    }
-    const currentTrackId = roomQueue[roomCurrent]?.id
-    withViewTransition(() => {
-      updateLocalPlayback({
-        queue,
-        current: Math.max(0, queue.findIndex((item) => item.id === currentTrackId)),
-        playing: roomPlaying,
-      })
-      setUrlRoom('')
-    })
-  }, [updateLocalPlayback, localPlaybackState.queue, roomQueue, roomCurrent, roomPlaying, setUrlRoom])
+ const joinRoom = useCallback((code) => {
+  setView('home')
+  setUrlRoom(code)
+}, [setUrlRoom])
 
-  const navigate = useCallback((id) => {
-    if (id === view) return
-    withViewTransition(() => setView(id))
-  }, [view])
+const leaveRoom = useCallback(() => {
+  if (!roomQueue.length) {
+    setUrlRoom('')
+    return
+  }
+  const queue = [...roomQueue]
+  for (const track of localPlaybackState.queue) {
+    if (!queue.some((item) => item.id === track.id)) queue.push(track)
+  }
+  const currentTrackId = roomQueue[roomCurrent]?.id
+  updateLocalPlayback({
+    queue,
+    current: Math.max(0, queue.findIndex((item) => item.id === currentTrackId)),
+    playing: roomPlaying,
+  })
+  setUrlRoom('')
+}, [updateLocalPlayback, localPlaybackState.queue, roomQueue, roomCurrent, roomPlaying, setUrlRoom])
+
+const navigate = useCallback((id) => {
+  if (id !== view) setView(id)
+}, [view])
 
   const roomPlaybackActive = Boolean(roomCode && roomQueue.length)
   const playbackState = roomPlaybackActive ? room : localPlaybackState
@@ -158,20 +156,27 @@ function Shell() {
   }
 
   const activeView = view
-
+  
   return (
+
+    
     <div className="app-shell">
       <Sidenav view={activeView} onNavigate={navigate} open={navOpen} onClose={() => setNavOpen(false)} />
 
       <div className="app-content">
         <Topbar onMenuOpen={() => setNavOpen(true)} />
-        <PersistentPlayer playback={playbackState} onPlaybackChange={updateActivePlayback} />
-        <QueueFly motion={queueFly} onComplete={completeQueueFly} />
-        <div className="app-body">
-          <div className="route-stage" key={`${view}:${roomCode || 'local'}`}>
-            {renderContent()}
-          </div>
-        </div>
+        <ErrorBoundary label="The player">
+  <PersistentPlayer playback={playbackState} onPlaybackChange={updateActivePlayback} />
+</ErrorBoundary>
+
+       <QueueFly motion={queueFly} onComplete={completeQueueFly} />
+<div className="app-body">
+  <ErrorBoundary label="This page" resetKey={`${view}:${roomCode || 'local'}`}>
+    <div className="route-stage" key={`${view}:${roomCode || 'local'}`}>
+      {renderContent()}
+    </div>
+  </ErrorBoundary>
+</div>
         <BottomNav view={activeView} onNavigate={navigate} />
       </div>
 

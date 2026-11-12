@@ -34,11 +34,13 @@ export function PlaybackProvider({ children }) {
   const registerPlayer = useCallback((player) => { playerRef.current = player }, [])
 
   const startVideo = useCallback((videoId) => {
-    const player = playerRef.current
-    if (!player || !videoId) return
-    if (player.getVideoData?.().video_id === videoId) player.playVideo()
+  const player = playerRef.current
+  if (!player || !videoId) return
+  try {
+    if (player.getVideoData?.()?.video_id === videoId) player.playVideo()
     else player.loadVideoById(videoId)
-  }, [])
+  } catch (error) { console.warn('Player not ready:', error) }
+}, [])
 
   const playTrack = useCallback((track) => {
     if (!track?.id) return

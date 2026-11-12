@@ -7,6 +7,8 @@ export default function Topbar({ onMenuOpen }) {
       <button className="topbar-menu-btn" onClick={onMenuOpen} aria-label="Open menu">
         <Menu size={22} />
       </button>
+     
+<div className="topbar-spacer" />
       <div className="topbar-logo">
         <span className="logo-mark"><Music2 size={16} strokeWidth={2.4} /></span>
         <span>jamroom</span>
