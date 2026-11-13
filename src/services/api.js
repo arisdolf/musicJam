@@ -8,6 +8,10 @@ export async function api(path, options = {}) {
   if (token) headers.Authorization = `Bearer ${token}`
   const response = await fetch(`${API_URL}${path}`, { ...options, headers, body: options.body && typeof options.body !== 'string' ? JSON.stringify(options.body) : options.body })
   const data = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`)
+  if (!response.ok) {
+    const error = new Error(data.error || `Request failed (${response.status})`)
+    error.status = response.status
+    throw error
+  }
   return data
 }

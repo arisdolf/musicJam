@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getSyncedLyrics, parseSyncedLyrics } from '../services/lyrics'
 import { usePlayback } from '../features/playback/PlaybackContext'
+import { useAccount } from '../features/account/AccountContext'
 import { rubberBandAtBounds } from '../utils/motion'
-import { ListMusic, Loader, Minus, Music2, Pause, Play, Plus, SkipBack, SkipForward, Trash2, X } from 'lucide-react'
+import AddToPlaylist from './AddToPlaylist'
+import { searchYouTube } from '../services/youtube'
+import {
+  ArrowLeft, Check, ChevronDown, Disc3, ListMusic, Loader, LogIn, Menu, Mic2, Minus, Pause, Play, Plus,
+  Search, Settings, SkipBack, SkipForward, Trash2,
+} from 'lucide-react'
 
 const YOUTUBE_READY_EVENT = 'onYouTubeIframeAPIReady'
 const OFFSET_KEY = 'jamroom:lyric-offset:'
@@ -12,20 +18,21 @@ function readOffset(trackId) {
   try { return Number(localStorage.getItem(OFFSET_KEY + trackId)) || 0 } catch { return 0 }
 }
 
-export default function PersistentPlayer({ playback, onPlaybackChange }) {
+export default function PersistentPlayer({ playback, onPlaybackChange, onNavigate, onPlayTrack, onQueueTrack }) {
   const { registerPlayer } = usePlayback()
+  const { user, openAuth } = useAccount()
   const [playerReady, setPlayerReady] = useState(false)
-  const [panel, setPanel] = useState(null)
-  const [panelOpen, setPanelOpen] = useState(false)
-  const [pendingPanel, setPendingPanel] = useState(null)
-  const [panelOrigin, setPanelOrigin] = useState('90% 0%')
+  const [expanded, setExpanded] = useState(false)
+  const [view, setView] = useState('player')        // 'player' | 'queue'
+  const [lyricsFull, setLyricsFull] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [lyricsState, setLyricsState] = useState({ key: '', record: null, error: '' })
   const [active, setActive] = useState({ key: '', index: -1 })
   const [offsets, setOffsets] = useState({})
   const playerHostRef = useRef(null)
   const playerRef = useRef(null)
   const requestedVideoRef = useRef(null)
-  const hasPlayedRef = useRef(false) // has the CURRENT video actually started playing?
+  const hasPlayedRef = useRef(false)
   const lyricLineRefs = useRef([])
   const lyricsListRef = useRef(null)
   const callbacksRef = useRef({ playback, onPlaybackChange })
@@ -40,17 +47,20 @@ export default function PersistentPlayer({ playback, onPlaybackChange }) {
   const currentTrackArtist = currentTrack?.artist
   const currentTrackDuration = currentTrack?.duration
   const currentTrackThumbnail = currentTrack?.thumbnail
+  const art = currentTrackId ? (currentTrackThumbnail || `https://i.ytimg.com/vi/${currentTrackId}/mqdefault.jpg`) : ''
   const lyricsKey = currentTrack ? [currentTrackId, currentTrackLyricsId || '', currentTrackTitle || '', currentTrackArtist || ''].join('|') : ''
   const lyricsRecord = lyricsState.key === lyricsKey ? lyricsState.record : null
   const lyricsLoading = Boolean(currentTrack && lyricsState.key !== lyricsKey)
   const lyricsError = lyricsState.key === lyricsKey ? lyricsState.error : ''
   const lyricsRecordId = lyricsRecord ? String(lyricsRecord.id) : ''
-  const queueOpen = panel === 'queue' && panelOpen
-  const lyricsOpen = panel === 'lyrics' && panelOpen
+  const fullOpen = expanded && Boolean(currentTrack)
+  const lyricsOpen = fullOpen && view === 'player' && lyricsFull
   const lyricLines = useMemo(() => parseSyncedLyrics(lyricsRecord?.syncedLyrics), [lyricsRecord])
   const activeLyricIndex = lyricsRecordId && active.key === lyricsRecordId ? active.index : -1
   const lyricOffset = currentTrackId ? (offsets[currentTrackId] ?? readOffset(currentTrackId)) : 0
   const currentLyricText = activeLyricIndex >= 0 ? lyricLines[activeLyricIndex]?.text : ''
+
+  const collapse = useCallback(() => { setExpanded(false); setMenuOpen(false); setView('player') }, [])
 
   const requestVideo = useCallback((track, shouldPlay = true) => {
     const player = playerRef.current
@@ -81,8 +91,7 @@ export default function PersistentPlayer({ playback, onPlaybackChange }) {
     else playerRef.current?.pauseVideo?.()
   }, [onPlaybackChange, playbackCurrent, playbackQueue, requestVideo])
 
-  // If the browser blocked autoplay the app thinks it is playing but the video never
-  // started (YouTube state -1 / 5). In that case the first click should start it.
+  // If the browser blocked autoplay, the first click should actually start the video.
   const togglePlay = () => {
     const state = playerRef.current?.getPlayerState?.()
     if (playbackPlaying && (state === -1 || state === 5) && currentTrack) {
@@ -108,40 +117,28 @@ export default function PersistentPlayer({ playback, onPlaybackChange }) {
     } catch { /* storage is optional */ }
   }
 
-  const togglePanel = (nextPanel, trigger) => {
-    if (panel === nextPanel && panelOpen) {
-      setPendingPanel(null)
-      setPanelOpen(false)
-    } else if (panel && panelOpen) {
-      if (trigger) setPanelOrigin(getPanelOrigin(trigger))
-      setPendingPanel(nextPanel)
-      setPanelOpen(false)
-    } else {
-      if (trigger) setPanelOrigin(getPanelOrigin(trigger))
-      setPanel(nextPanel)
-      setPanelOpen(true)
-    }
-  }
-
-  const finishPanelExit = (event) => {
-    if (event.animationName !== 'panel-exit') return
-    if (pendingPanel) {
-      setPanel(pendingPanel)
-      setPendingPanel(null)
-      setPanelOpen(true)
-    } else setPanel(null)
-  }
+  const go = (id) => { onNavigate?.(id); collapse() }
 
   useEffect(() => { callbacksRef.current = { playback, onPlaybackChange } }, [playback, onPlaybackChange])
 
-  // ── YouTube player (safe under React StrictMode) ───────────────────────────
+  useEffect(() => {
+    if (!fullOpen) return undefined
+    const onKey = (event) => {
+      if (event.key !== 'Escape') return
+      if (menuOpen) setMenuOpen(false)
+      else collapse()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [fullOpen, menuOpen, collapse])
+
+  // ── YouTube player (kept alive but hidden: audio only) ─────────────────────
   useEffect(() => {
     let cancelled = false
     const host = playerHostRef.current
 
     const createPlayer = () => {
       if (cancelled || !host || !window.YT?.Player || playerRef.current) return
-      // YouTube replaces the element it is given, so hand it a throwaway child.
       const mount = document.createElement('div')
       host.appendChild(mount)
       playerRef.current = new window.YT.Player(mount, {
@@ -173,7 +170,6 @@ export default function PersistentPlayer({ playback, onPlaybackChange }) {
             if (event.data === 1 && !latest.playback.playing) {
               latest.onPlaybackChange((state) => ({ ...state, playing: true }))
             }
-            // Ignore the transient "paused" YouTube reports while a new video is still loading.
             if (event.data === 2 && latest.playback.playing && hasPlayedRef.current) {
               latest.onPlaybackChange((state) => ({ ...state, playing: false }))
             }
@@ -183,7 +179,6 @@ export default function PersistentPlayer({ playback, onPlaybackChange }) {
                 : { ...state, playing: false })
             }
           },
-          // 2 bad id · 5 html5 error · 100 removed · 101/150 embedding blocked: skip ahead.
           onError: () => {
             requestedVideoRef.current = null
             callbacksRef.current.onPlaybackChange((state) => state.current < state.queue.length - 1
@@ -215,7 +210,6 @@ export default function PersistentPlayer({ playback, onPlaybackChange }) {
     }
   }, [registerPlayer])
 
-  // Keep the video in step with the queue / play state, and make sure it really starts.
   useEffect(() => {
     const player = playerRef.current
     if (!playerReady || !player || !currentTrackId) return undefined
@@ -235,7 +229,6 @@ export default function PersistentPlayer({ playback, onPlaybackChange }) {
     }
 
     if (!playbackPlaying) return undefined
-    // Autoplay watchdog: if the video is still not playing, nudge it once.
     const timer = setTimeout(() => {
       const state = player.getPlayerState?.()
       if (state !== 1 && state !== 3) {
@@ -248,7 +241,6 @@ export default function PersistentPlayer({ playback, onPlaybackChange }) {
   // ── Lyrics fetch ───────────────────────────────────────────────────────────
   useEffect(() => {
     if (!lyricsKey) return undefined
-
     const controller = new AbortController()
     getSyncedLyrics({
       id: currentTrackId,
@@ -259,7 +251,7 @@ export default function PersistentPlayer({ playback, onPlaybackChange }) {
     }, controller.signal)
       .then((record) => {
         if (!controller.signal.aborted) {
-          setLyricsState({ key: lyricsKey, record, error: record ? '' : 'No synced lyrics are available for this song.' })
+          setLyricsState({ key: lyricsKey, record, error: record ? '' : 'No synced lyrics for this song.' })
         }
       })
       .catch((error) => {
@@ -270,11 +262,10 @@ export default function PersistentPlayer({ playback, onPlaybackChange }) {
     return () => controller.abort()
   }, [lyricsKey, currentTrackId, currentTrackLyricsId, currentTrackTitle, currentTrackArtist, currentTrackDuration])
 
-  // ── Lyric sync: poll the player clock and only re-render when the line changes ──
+  // ── Lyric sync ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const player = playerRef.current
     if (!playerReady || !player || !lyricLines.length || !lyricsRecordId) return undefined
-
     const tick = () => {
       const time = Number(player.getCurrentTime?.() || 0) - lyricOffset
       const index = findLyricIndex(lyricLines, time)
@@ -287,7 +278,6 @@ export default function PersistentPlayer({ playback, onPlaybackChange }) {
     return () => clearInterval(timer)
   }, [playerReady, lyricLines, lyricsRecordId, lyricOffset])
 
-  // Scroll only the lyrics box (scrollIntoView also scrolls the whole page).
   useEffect(() => {
     const list = lyricsListRef.current
     const line = lyricLineRefs.current[activeLyricIndex]
@@ -321,61 +311,183 @@ export default function PersistentPlayer({ playback, onPlaybackChange }) {
   }, [currentTrackId, currentTrackTitle, currentTrackArtist, currentTrackThumbnail, playbackCurrent, changePlaying, playIndex])
 
   const offsetLabel = `${lyricOffset > 0 ? '+' : ''}${lyricOffset.toFixed(1)}s`
+  const lineAt = (index) => (index >= 0 && index < lyricLines.length ? lyricLines[index].text || '♪' : '')
+  const windowLines = activeLyricIndex >= 0
+    ? [lineAt(activeLyricIndex - 1), lineAt(activeLyricIndex), lineAt(activeLyricIndex + 1)]
+    : ['', '♪', lineAt(0)]
+  const canPrev = playbackCurrent > 0
+  const canNext = playbackCurrent < playbackQueue.length - 1
 
-  return <aside className={`persistent-player${currentTrack ? ' has-track' : ' is-empty'}`} aria-label="Music player">
-    <div className="persistent-player-video" ref={playerHostRef} />
-    {currentTrack && <>
-      <div className="persistent-player-info">
-        <span className="persistent-player-icon"><Music2 size={17} /></span>
-        <div className="persistent-player-copy">
-          <span className="persistent-player-kicker">NOW PLAYING</span>
+  return <>
+    {/* The video lives here, off-screen. Only its audio is used. */}
+    <div className="yt-host" ref={playerHostRef} aria-hidden="true" />
+
+    {currentTrack && !fullOpen && <div className="mini-player" role="region" aria-label="Music player">
+      <button className="mini-open" onClick={() => setExpanded(true)} aria-label={`Open player. Now playing ${currentTrack.title}`}>
+        <img src={art} alt="" />
+        <span className="mini-copy">
           <strong title={currentTrack.title}>{currentTrack.title}</strong>
-          <small>{currentTrack.artist}</small>
-          {currentLyricText && <span key={activeLyricIndex} className="persistent-current-lyric">{currentLyricText}</span>}
-          <span key={playbackQueue.length} className="player-queue-count">{playbackQueue.length} IN QUEUE</span>
-        </div>
-      </div>
-      <div className="persistent-player-controls">
-        <button className="icon-btn" onClick={() => playIndex(playback.current - 1)} disabled={playback.current <= 0} aria-label="Previous song"><SkipBack size={17} /></button>
-        <button className="persistent-play-btn" onClick={togglePlay} aria-label={playbackPlaying ? 'Pause' : 'Play'}><span key={playbackPlaying ? 'pause' : 'play'} className="motion-icon">{playbackPlaying ? <Pause size={17} /> : <Play size={17} fill="currentColor" />}</span></button>
-        <button className="icon-btn" onClick={() => playIndex(playback.current + 1)} disabled={playback.current >= playback.queue.length - 1} aria-label="Next song"><SkipForward size={17} /></button>
-        <button className={`icon-btn${lyricsOpen ? ' active' : ''}`} onClick={(event) => togglePanel('lyrics', event.currentTarget)} aria-label="Toggle lyrics" aria-expanded={lyricsOpen} title="Lyrics"><Music2 size={17} /></button>
-        <button className={`icon-btn${queueOpen ? ' active' : ''}`} data-player-queue-trigger onClick={(event) => togglePanel('queue', event.currentTarget)} aria-label="Open queue" aria-expanded={queueOpen} title="Queue"><ListMusic size={17} /></button>
-      </div>
-      {panel === 'queue' && <div className={`persistent-panel persistent-queue-panel persistent-panel-${panelOpen ? 'enter' : 'exit'}`} style={{ transformOrigin: panelOrigin }} onAnimationEnd={finishPanelExit}>
-        <div className="persistent-panel-heading"><strong>Up next</strong><span>{playback.queue.length} {playback.queue.length === 1 ? 'song' : 'songs'}</span><button className="icon-btn" onClick={() => togglePanel('queue')} aria-label="Close queue"><X size={17} /></button></div>
-        {playbackQueue.length === 0 ? <p className="persistent-panel-empty">Your queue is empty.</p> : <ul className="persistent-queue-list" onWheel={(event) => rubberBandAtBounds(event.currentTarget, event.deltaY)}>
-          {playbackQueue.map((track, index) => <li className={index === playbackCurrent ? 'current' : ''} key={`${track.id}-${index}`}>
-            <button className="persistent-queue-track" onClick={() => playIndex(index)}>
-              <img src={track.thumbnail || `https://i.ytimg.com/vi/${track.id}/mqdefault.jpg`} alt="" />
-              <span><strong>{track.title}</strong><small>{track.artist}</small></span>
-            </button>
-            <button className="icon-btn" onClick={() => removeTrack(index)} aria-label={`Remove ${track.title}`}><Trash2 size={15} /></button>
-          </li>)}
-        </ul>}
-      </div>}
-      {panel === 'lyrics' && <div className={`persistent-panel persistent-lyrics-panel persistent-panel-${panelOpen ? 'enter' : 'exit'}`} style={{ transformOrigin: panelOrigin }} onAnimationEnd={finishPanelExit}>
-        <div className="persistent-panel-heading">
-          <strong>Synced lyrics</strong>
-          {lyricLines.length > 0 && <div className="lyric-offset" role="group" aria-label="Adjust lyric timing">
-            <button onClick={() => nudgeOffset(-0.5)} aria-label="Show lyrics earlier" title="Lyrics late? Show them earlier"><Minus size={13} /></button>
-            <span title="Lyric timing offset">{offsetLabel}</span>
-            <button onClick={() => nudgeOffset(0.5)} aria-label="Show lyrics later" title="Lyrics early? Show them later"><Plus size={13} /></button>
-          </div>}
-          <button className="icon-btn" onClick={() => togglePanel('lyrics')} aria-label="Close lyrics"><X size={17} /></button>
-        </div>
-        {lyricsLoading && <p className="persistent-panel-empty"><Loader size={15} className="spin" /> Loading lyrics…</p>}
-        {!lyricsLoading && lyricsError && <p className="persistent-panel-empty">{lyricsError}</p>}
-        {!lyricsLoading && !lyricsError && <div className="persistent-lyrics-list" ref={lyricsListRef} onWheel={(event) => rubberBandAtBounds(event.currentTarget, event.deltaY)}>
-          {lyricLines.map((line, index) => <p
-            key={`${line.time}-${index}`}
-            ref={(element) => { lyricLineRefs.current[index] = element }}
-            className={index === activeLyricIndex ? 'current' : ''}
-          >{line.text || '♪'}</p>)}
-        </div>}
-      </div>}
-    </>}
-  </aside>
+          <small>{currentLyricText || currentTrack.artist}</small>
+        </span>
+      </button>
+      <button className="icon-btn" onClick={() => playIndex(playbackCurrent - 1)} disabled={!canPrev} aria-label="Previous song"><SkipBack size={17} /></button>
+      <button className="mini-play" onClick={togglePlay} aria-label={playbackPlaying ? 'Pause' : 'Play'}>
+        <span key={playbackPlaying ? 'pause' : 'play'} className="motion-icon">{playbackPlaying ? <Pause size={17} /> : <Play size={17} fill="currentColor" />}</span>
+      </button>
+      <button className="icon-btn" onClick={() => playIndex(playbackCurrent + 1)} disabled={!canNext} aria-label="Next song"><SkipForward size={17} /></button>
+    </div>}
+
+    {fullOpen && <div className="np-overlay" role="dialog" aria-modal="true" aria-label="Now playing"
+      onMouseDown={(event) => { if (event.target === event.currentTarget) collapse() }}>
+      <section className="np-card">
+        <div className="np-backdrop" style={{ backgroundImage: `url("${art}")` }} aria-hidden="true" />
+
+        <header className="np-top">
+  <button className="np-icon" onClick={view === 'player' ? collapse : () => setView('player')} aria-label={view === 'player' ? 'Close player' : 'Back to player'}>
+    {view === 'player' ? <ChevronDown size={22} /> : <ArrowLeft size={20} />}
+  </button>
+  <span className="np-kicker">{view === 'queue' ? 'UP NEXT' : view === 'search' ? 'ADD MUSIC' : 'NOW PLAYING'}</span>
+  <span className="np-top-spacer" />
+</header>
+
+        {view === 'search'
+  ? <SongSearch
+      queuedIds={playbackQueue.map((track) => track.id)}
+      onPlay={onPlayTrack}
+      onQueue={onQueueTrack}
+    />
+  : view === 'queue'
+          ? <ul className="np-queue-list" onWheel={(event) => rubberBandAtBounds(event.currentTarget, event.deltaY)}>
+              {playbackQueue.map((track, index) => <li className={index === playbackCurrent ? 'current' : ''} key={`${track.id}-${index}`}>
+                <button className="np-queue-track" onClick={() => playIndex(index)}>
+                  <img src={track.thumbnail || `https://i.ytimg.com/vi/${track.id}/mqdefault.jpg`} alt="" />
+                  <span><strong>{track.title}</strong><small>{track.artist}</small></span>
+                </button>
+                <button className="np-icon small" onClick={() => removeTrack(index)} aria-label={`Remove ${track.title}`}><Trash2 size={15} /></button>
+              </li>)}
+            </ul>
+          : <div className="np-body">
+              <div className={`np-stage${lyricsFull ? ' is-lyrics' : ''}`}>
+                {lyricsFull
+                  ? <>
+                      <div className="np-lyrics-bar">
+                        <span>Synced lyrics</span>
+                        {lyricLines.length > 0 && <div className="lyric-offset" role="group" aria-label="Adjust lyric timing">
+                          <button onClick={() => nudgeOffset(-0.5)} aria-label="Show lyrics earlier" title="Lyrics late? Show them earlier"><Minus size={13} /></button>
+                          <span title="Lyric timing offset">{offsetLabel}</span>
+                          <button onClick={() => nudgeOffset(0.5)} aria-label="Show lyrics later" title="Lyrics early? Show them later"><Plus size={13} /></button>
+                        </div>}
+                      </div>
+                      {lyricsLoading && <p className="np-lyrics-note"><Loader size={15} className="spin" /> Loading lyrics…</p>}
+                      {!lyricsLoading && lyricsError && <p className="np-lyrics-note">{lyricsError}</p>}
+                      {!lyricsLoading && !lyricsError && <div className="np-lyrics-list" ref={lyricsListRef} onWheel={(event) => rubberBandAtBounds(event.currentTarget, event.deltaY)}>
+                        {lyricLines.map((line, index) => <p
+                          key={`${line.time}-${index}`}
+                          ref={(element) => { lyricLineRefs.current[index] = element }}
+                          className={index === activeLyricIndex ? 'current' : ''}
+                        >{line.text || '♪'}</p>)}
+                      </div>}
+                    </>
+                  : <img key={currentTrackId} className="np-art" src={art} alt="" />}
+              </div>
+
+              <div className="np-title-row">
+                <div className="np-title">
+                  <strong title={currentTrack.title}>{currentTrack.title}</strong>
+                  <small>{currentTrack.artist}</small>
+                </div>
+                <AddToPlaylist track={currentTrack} />
+              </div>
+
+              {!lyricsFull && <div className="np-lyric-window" aria-live="off">
+                {lyricsLoading
+                  ? <p className="current"><Loader size={15} className="spin" /> Loading lyrics…</p>
+                  : lyricsError
+                    ? <p>{lyricsError}</p>
+                    : windowLines.map((text, slot) => <p key={`${activeLyricIndex}:${slot}`} className={slot === 1 ? 'current' : ''}>{text}</p>)}
+              </div>}
+
+              <ProgressBar key={currentTrackId} playerRef={playerRef} fallbackDuration={currentTrackDuration} />
+            </div>}
+
+        <footer className="np-controls">
+  <button className={`np-circle${lyricsFull && view === 'player' ? ' active' : ''}`} onClick={() => { setView('player'); setLyricsFull((open) => !open) }} aria-label="Toggle full lyrics" aria-pressed={lyricsFull}><Mic2 size={17} /></button>
+  <button className="np-icon" onClick={() => playIndex(playbackCurrent - 1)} disabled={!canPrev} aria-label="Previous song"><SkipBack size={22} fill="currentColor" /></button>
+  <button className="np-play" onClick={togglePlay} aria-label={playbackPlaying ? 'Pause' : 'Play'}>
+    <span key={playbackPlaying ? 'pause' : 'play'} className="motion-icon">{playbackPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}</span>
+  </button>
+  <button className="np-icon" onClick={() => playIndex(playbackCurrent + 1)} disabled={!canNext} aria-label="Next song"><SkipForward size={22} fill="currentColor" /></button>
+  <button className={`np-circle${menuOpen ? ' active' : ''}`} onClick={() => setMenuOpen((open) => !open)} aria-label="More options" aria-haspopup="menu" aria-expanded={menuOpen}><Menu size={17} /></button>
+</footer>
+
+        {menuOpen && <>
+          <div className="np-menu-scrim" onClick={() => setMenuOpen(false)} />
+          <div className="np-menu" role="menu">
+            <button role="menuitem" onClick={() => { setView('search'); setMenuOpen(false) }}><Search size={16} /> Add music</button>
+            <button role="menuitem" onClick={() => { setView('queue'); setMenuOpen(false) }}><ListMusic size={16} /> Queue <small>{playbackQueue.length}</small></button>
+            {user
+              ? <>
+                  <button role="menuitem" onClick={() => go('playlists')}><Disc3 size={16} /> My playlists</button>
+                  <button role="menuitem" onClick={() => go('settings')}><Settings size={16} /> Settings</button>
+                </>
+              : <button role="menuitem" onClick={() => { collapse(); openAuth('login') }}><LogIn size={16} /> Log in to save music</button>}
+          </div>
+        </>}
+      </section>
+    </div>}
+  </>
+}
+
+// Polls the player clock itself so only this small bar re-renders, not the whole player.
+function ProgressBar({ playerRef, fallbackDuration }) {
+  const [clock, setClock] = useState({ time: 0, duration: fallbackDuration || 0 })
+  const [drag, setDrag] = useState(null)
+
+  useEffect(() => {
+    const tick = () => {
+      const player = playerRef.current
+      if (!player) return
+      const time = Number(player.getCurrentTime?.() || 0)
+      const duration = Number(player.getDuration?.() || 0) || fallbackDuration || 0
+      setClock((previous) => Math.abs(previous.time - time) < 0.2 && previous.duration === duration ? previous : { time, duration })
+    }
+    tick()
+    const timer = setInterval(tick, 250)
+    return () => clearInterval(timer)
+  }, [playerRef, fallbackDuration])
+
+  const commit = (value) => {
+    try { if (Number.isFinite(value)) playerRef.current?.seekTo?.(value, true) } catch { /* player not ready */ }
+    setClock((previous) => ({ ...previous, time: value }))
+    setDrag(null)
+  }
+
+  const shown = drag ?? clock.time
+  const pct = clock.duration ? Math.min(100, (shown / clock.duration) * 100) : 0
+
+  return <div className="np-progress">
+    <input
+      className="np-seek"
+      type="range"
+      min="0"
+      max={clock.duration || 1}
+      step="0.1"
+      value={shown}
+      disabled={!clock.duration}
+      aria-label="Seek"
+      style={{ '--pct': `${pct}%` }}
+      onChange={(event) => setDrag(Number(event.target.value))}
+      onPointerUp={(event) => commit(Number(event.currentTarget.value))}
+      onPointerCancel={() => setDrag(null)}
+      onKeyUp={(event) => commit(Number(event.currentTarget.value))}
+    />
+    <div className="np-times"><span>{formatTime(shown)}</span><span>{formatTime(clock.duration)}</span></div>
+  </div>
+}
+
+function formatTime(seconds = 0) {
+  const total = Math.max(0, Math.floor(seconds))
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
 }
 
 function findLyricIndex(lines, currentTime) {
@@ -390,16 +502,58 @@ function findLyricIndex(lines, currentTime) {
   return result
 }
 
-function getPanelOrigin(trigger) {
-  const rect = trigger.getBoundingClientRect()
-  const mobile = window.innerWidth <= 480
-  const width = mobile ? window.innerWidth - 16 : Math.min(420, window.innerWidth - 24)
-  const height = Math.min(window.innerHeight * 0.65, 520)
-  const left = mobile ? 8 : window.innerWidth - width - 12
-  const top = mobile
-    ? window.innerHeight - height - 76
-    : (document.querySelector('.persistent-player')?.getBoundingClientRect().bottom || rect.bottom) + 8
-  const x = Math.max(0, Math.min(width, rect.left + rect.width / 2 - left))
-  const y = Math.max(0, Math.min(height, rect.top + rect.height / 2 - top))
-  return `${x}px ${y}px`
+function SongSearch({ queuedIds, onPlay, onQueue }) {
+  const [query, setQuery] = useState('')
+  const [state, setState] = useState({ query: '', results: [], searching: false, error: '' })
+  const q = query.trim()
+  const hasResult = state.query === q
+  const results = hasResult ? state.results : []
+  const searching = Boolean(q && (!hasResult || state.searching))
+  const error = hasResult ? state.error : ''
+
+  useEffect(() => {
+    if (!q) return undefined
+    const controller = new AbortController()
+    const timer = setTimeout(async () => {
+      setState({ query: q, results: [], searching: true, error: '' })
+      try {
+        const tracks = await searchYouTube(q, controller.signal)
+        if (!controller.signal.aborted) {
+          setState({ query: q, results: tracks, searching: false, error: tracks.length ? '' : 'No songs found. Try another search.' })
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError' && !controller.signal.aborted) {
+          setState({ query: q, results: [], searching: false, error: err.message || 'Song search failed.' })
+        }
+      }
+    }, 300)
+    return () => { clearTimeout(timer); controller.abort() }
+  }, [q])
+
+  return <div className="np-search">
+    <input
+      value={query}
+      onChange={(event) => setQuery(event.target.value)}
+      placeholder="Search songs or artists"
+      aria-label="Search songs or artists"
+      autoFocus
+    />
+    <ul className="np-queue-list" onWheel={(event) => rubberBandAtBounds(event.currentTarget, event.deltaY)}>
+      {!q && <li className="np-search-note">Type a song or artist to add it.</li>}
+      {searching && <li className="np-search-note"><Loader size={15} className="spin" /> Searching…</li>}
+      {!searching && error && <li className="np-search-note">{error}</li>}
+      {!searching && results.map((track) => {
+        const queued = queuedIds.includes(track.id)
+        return <li key={track.id}>
+          <button className="np-queue-track" onClick={() => onPlay?.(track)}>
+            <img src={track.thumbnail} alt="" />
+            <span><strong>{track.title}</strong><small>{track.artist}</small></span>
+          </button>
+          <button className="np-icon small" onClick={(event) => !queued && onQueue?.(track, event.currentTarget)} disabled={queued} aria-label={queued ? `${track.title} is in the queue` : `Add ${track.title} to queue`}>
+            {queued ? <Check size={16} /> : <Plus size={17} />}
+          </button>
+        </li>
+      })}
+    </ul>
+  </div>
 }

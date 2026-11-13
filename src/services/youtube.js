@@ -152,3 +152,36 @@ function isAvailableInRegion(details, regionCode) {
   if (restriction.allowed && !restriction.allowed.includes(regionCode)) return false
   return true
 }
+
+// Finds the best playable YouTube match for one imported song.
+// Costs one search + one videos.list call. Returns null when nothing fits.
+export async function matchSong({ title, artist, duration }, signal) {
+  const q = `${artist} ${title}`.trim()
+  const search = await yt('search', {
+    part: 'snippet', type: 'video', videoCategoryId: '10',
+    videoEmbeddable: 'true', videoSyndicated: 'true', regionCode: REGION,
+    maxResults: '5', order: 'relevance', q,
+  }, signal)
+  const ids = (search.items || []).map((item) => item.id?.videoId).filter(Boolean)
+  if (!ids.length) return null
+
+  const details = await yt('videos', { part: 'snippet,status,contentDetails,statistics', id: ids.join(',') }, signal)
+  const byId = new Map((details.items || []).map((item) => [item.id, item]))
+  const wanted = title.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(Boolean)
+
+  let best = null, bestScore = -Infinity
+  ids.forEach((id, index) => {
+    const item = byId.get(id)
+    if (!item || !isPlayable(item, REGION)) return
+    const track = toTrack(item)
+    const haystack = track.title.toLowerCase()
+    const titleHits = wanted.filter((word) => haystack.includes(word)).length
+    let score = (wanted.length ? titleHits / wanted.length : 0) * 3 - index * 0.3
+    if (duration && track.duration) {
+      const diff = Math.abs(track.duration - duration)
+      score += diff <= 5 ? 3 : diff <= 15 ? 1 : diff > 40 ? -3 : 0
+    }
+    if (score > bestScore) { best = track; bestScore = score }
+  })
+  return bestScore > 0 ? best : null
+}

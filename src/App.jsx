@@ -15,7 +15,6 @@ import Settings from './pages/Settings'
 import PersistentPlayer from './components/PersistentPlayer'
 import QueueFly from './components/QueueFly'
 import { useAccount } from './features/account/AccountContext'
-import { withViewTransition } from './utils/viewTransitions'
 import ErrorBoundary from './components/ErrorBoundary'
 
 // ── Inner shell (needs AccountContext) ────────────────────────────────────────
@@ -160,13 +159,19 @@ const navigate = useCallback((id) => {
   return (
 
     
-    <div className="app-shell">
+   <div className={`app-shell${playbackState.queue.length ? ' has-player' : ''}`}>
       <Sidenav view={activeView} onNavigate={navigate} open={navOpen} onClose={() => setNavOpen(false)} />
 
       <div className="app-content">
         <Topbar onMenuOpen={() => setNavOpen(true)} />
         <ErrorBoundary label="The player">
-  <PersistentPlayer playback={playbackState} onPlaybackChange={updateActivePlayback} />
+   <PersistentPlayer
+  playback={playbackState}
+  onPlaybackChange={updateActivePlayback}
+  onNavigate={navigate}
+  onPlayTrack={playTrack}
+  onQueueTrack={queueTrack}
+/>
 </ErrorBoundary>
 
        <QueueFly motion={queueFly} onComplete={completeQueueFly} />
