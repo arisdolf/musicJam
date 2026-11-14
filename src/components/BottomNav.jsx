@@ -1,16 +1,16 @@
 // src/components/BottomNav.jsx  — mobile-only bottom navigation bar
-import { Home, ListMusic, Compass, History, Settings } from 'lucide-react'
+import { Home, ListMusic, Gauge, History, Settings } from 'lucide-react'
 import { useAccount } from '../features/account/AccountContext'
 
 const NAV_GUEST = [
   { id: 'home',    label: 'Home',    icon: Home },
-  { id: 'explore', label: 'Explore', icon: Compass },
+  { id: 'quota',     label: 'Quota',     icon: Gauge },
   { id: 'recent',  label: 'Rooms',   icon: History },
 ]
 const NAV_AUTH = [
   { id: 'home',      label: 'Home',      icon: Home },
   { id: 'playlists', label: 'Playlists', icon: ListMusic },
-  { id: 'explore',   label: 'Explore',   icon: Compass },
+  { id: 'quota',     label: 'Quota',     icon: Gauge },
   { id: 'recent',    label: 'Rooms',     icon: History },
   { id: 'settings',  label: 'Settings',  icon: Settings },
 ]

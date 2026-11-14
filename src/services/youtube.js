@@ -8,46 +8,68 @@ const CACHE_TTL = 10 * 60 * 1000
 const KEYS = (import.meta.env.VITE_YOUTUBE_API_KEYS || import.meta.env.VITE_YOUTUBE_API_KEY || '')
   .split(',').map((key) => key.trim()).filter(Boolean)
 const QUOTA_REASONS = ['quotaExceeded', 'dailyLimitExceeded', 'RESOURCE_EXHAUSTED']
-const DEAD_KEY = 'jamroom:yt-exhausted'
+
+export const QUOTA_LIMIT = 10000
+const COSTS = { search: 100, videos: 1 }
+const USAGE_KEY = 'jamroom:yt-usage'
+
+function readUsage() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(USAGE_KEY) || 'null')
+    return saved?.day === pacificDay() ? saved : { day: pacificDay(), used: {} }
+  } catch { return { day: pacificDay(), used: {} } }
+}
+
+function writeUsage(usage) {
+  try { localStorage.setItem(USAGE_KEY, JSON.stringify(usage)) } catch { /* optional */ }
+  window.dispatchEvent(new Event('jamroom:quota'))
+}
+
+function addUsage(index, cost) {
+  const usage = readUsage()
+  usage.used[index] = Math.min(QUOTA_LIMIT, (usage.used[index] || 0) + cost)
+  writeUsage(usage)
+}
+
+function markFull(index) {
+  const usage = readUsage()
+  usage.used[index] = QUOTA_LIMIT
+  writeUsage(usage)
+}
+
+export function quotaStatus() {
+  const { used } = readUsage()
+  return KEYS.map((key, i) => ({
+    label: `Key ${i + 1}`,
+    hint: key.slice(-4),
+    used: used[i] || 0,
+    remaining: QUOTA_LIMIT - (used[i] || 0),
+  }))
+}
+
+export function resetQuota() { writeUsage({ day: pacificDay(), used: {} }) }
+
+// Quota resets at midnight Pacific time.
+export function msUntilReset() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles', hour12: false, hour: 'numeric', minute: 'numeric', second: 'numeric',
+  }).formatToParts(new Date())
+  const get = (type) => Number(parts.find((p) => p.type === type).value) % 24
+  return (86400 - (get('hour') * 3600 + get('minute') * 60 + get('second'))) * 1000
+}
+
 
 // YouTube quotas reset at midnight Pacific time, so "exhausted" only lasts for that day.
 const pacificDay = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date())
 
-function readExhausted() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(DEAD_KEY) || 'null')
-    return saved?.day === pacificDay() ? saved.indexes : []
-  } catch { return [] }
-}
 
-function markExhausted(index) {
-  const indexes = [...new Set([...readExhausted(), index])]
-  try { localStorage.setItem(DEAD_KEY, JSON.stringify({ day: pacificDay(), indexes })) } catch { /* optional */ }
-}
 const cache = new Map()
 
 export function searchYouTube(query, signal) {
   return searchMusic(query, { signal, limit: 10, order: 'relevance' })
 }
 
-export function searchPopularSongs(query, signal) {
-  return searchMusic(query, { signal, limit: 25, order: 'viewCount' })
-}
 
-export function getPopularMusic(regionCode = REGION, signal) {
-  return cached(`chart|${regionCode}`, async () => {
-    try {
-      const data = await yt('videos', {
-        part: 'snippet,statistics,status,contentDetails', chart: 'mostPopular',
-        regionCode, videoCategoryId: '10', maxResults: '25',
-      }, signal)
-      return (data.items || []).filter((item) => isPlayable(item, regionCode)).slice(0, 8).map(toTrack)
-    } catch (error) {
-      if (error.reason !== 'videoChartNotFound') throw error
-      return searchMusic('top music hits', { signal, limit: 8, order: 'viewCount' })
-    }
-  })
-}
 
 // ── Song vs. random video ─────────────────────────────────────────────────────
 // Hard no: things that are clearly not a song.
@@ -136,33 +158,14 @@ async function withLyrics(candidates, limit, signal) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 async function yt(path, params, signal) {
-  if (!KEYS.length) throw new Error('YouTube search needs a VITE_YOUTUBE_API_KEYS in .env.')
-  const dead = new Set(readExhausted())
-  let lastError = null
+  const response = await fetch(`/api/youtube?${new URLSearchParams({ path, ...params })}`, { signal })
+  const data = await response.json().catch(() => ({}))
+  if (response.ok) return data
 
-  for (let index = 0; index < KEYS.length; index++) {
-    if (dead.has(index)) continue
-    const response = await fetch(`${API}/${path}?${new URLSearchParams({ ...params, key: KEYS[index] })}`, { signal })
-    const data = await response.json().catch(() => ({}))
-    if (response.ok) return data
-
-    const reason = data.error?.errors?.[0]?.reason || data.error?.status || ''
-    const error = new Error(friendlyError(reason, data.error?.message))
-    error.reason = reason
-
-    if (QUOTA_REASONS.includes(reason)) {   // this key is used up: remember it, try the next
-      markExhausted(index)
-      lastError = error
-      continue
-    }
-    if (reason === 'keyInvalid') {          // bad key: skip it for this request
-      lastError = error
-      continue
-    }
-    throw error                             // any other error is real, so show it
-  }
-
-  throw lastError || Object.assign(new Error(friendlyError('quotaExceeded')), { reason: 'quotaExceeded' })
+  const reason = data.error?.errors?.[0]?.reason || data.error?.status || ''
+  const error = new Error(friendlyError(reason, data.error?.message))
+  error.reason = reason
+  throw error
 }
 
 function friendlyError(reason, fallback) {

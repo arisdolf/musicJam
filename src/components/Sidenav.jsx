@@ -1,11 +1,11 @@
 // src/components/Sidenav.jsx
 import { useEffect } from 'react'
 import { useAccount } from '../features/account/AccountContext'
-import { Music2, Home, ListMusic, Compass, History, Settings, LogIn, UserPlus, X, LogOut } from 'lucide-react'
+import { Music2, Home, ListMusic, Gauge, History, Settings, LogIn, UserPlus, X, LogOut } from 'lucide-react'
 
 const NAV = [
   { id: 'home',     label: 'Home',         icon: Home },
-  { id: 'explore',  label: 'Explore',      icon: Compass },
+  { id: 'quota', label: 'API Quota', icon: Gauge },
   { id: 'playlists',label: 'Playlists',    icon: ListMusic, authOnly: true },
   { id: 'recent',   label: 'Recent Rooms', icon: History },
   { id: 'settings', label: 'Settings',     icon: Settings,  authOnly: true },

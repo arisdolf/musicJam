@@ -9,7 +9,7 @@ import AuthModal from './components/AuthModal'
 import JoinRoom from './components/JoinRoom'
 import MusicRoom from './components/MusicRoom'
 import Playlists from './pages/Playlists'
-import Explore from './pages/Explore'
+import Quota from './pages/Quota'
 import RecentRooms from './pages/RecentRooms'
 import Settings from './pages/Settings'
 import PersistentPlayer from './components/PersistentPlayer'
@@ -159,8 +159,8 @@ const navigate = useCallback((id) => {
       return <MusicRoom roomCode={roomCode} room={room} updateRoom={updateRoom} connection={connection} members={members} onLeave={leaveRoom} onPlayTrack={playTrack} onQueueTrack={queueTrack} onPlayTracks={playTracks} onQueueTracks={queueTracks} />
     }
     switch (view) {
-      case 'playlists': return <Playlists onBrowse={() => navigate('explore')} onPlayTracks={playTracks} onQueueTrack={queueTrack} />
-      case 'explore':   return <Explore onPlayTrack={playTrack} onQueueTrack={queueTrack} />
+      case 'playlists': return <Playlists onBrowse={() => navigate('home')} onPlayTracks={playTracks} onQueueTrack={queueTrack} />
+        case 'quota':     return <Quota />
       case 'recent':    return <RecentRooms onJoin={joinRoom} />
       case 'settings':  return user ? <Settings /> : null
       default:          return <JoinRoom onJoin={joinRoom} />

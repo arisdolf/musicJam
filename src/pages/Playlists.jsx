@@ -203,7 +203,7 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
       <section className="playlist-tracks-section">
         <div className="block-head"><h2><ListMusic size={17} /> Songs</h2><span className="muted">{selected.tracks.length}</span></div>
         {selected.tracks.length === 0
-          ? <div className="playlist-empty-state compact"><Music2 size={28} /><h2>This playlist is empty</h2><p className="muted">Find a song you like and save it here.</p><button className="btn btn-primary btn-small" onClick={onBrowse}><Search size={15} /> Explore songs</button></div>
+          ? <div className="playlist-empty-state compact"><Music2 size={28} /><h2>This playlist is empty</h2><p className="muted">Find a song you like and save it here.</p><button className="btn btn-primary btn-small" onClick={onBrowse}><Search size={15} /> Find songs</button></div>
           : <ul className="track-list playlist-track-list">
             {selected.tracks.map((track, index) => <li className="track playlist-track" key={`${track.id}-${index}`}>
               <button className={`track-play ${track.id === currentTrackId ? 'is-selected' : ''}`} onClick={() => playAt(index)} aria-label={`Play ${track.title}`} title="Play this song"><Play size={15} fill="currentColor" /></button>
@@ -235,7 +235,7 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
     {deleteTarget && <ConfirmModal title={`Delete “${deleteTarget.name}”?`} message="This permanently removes the playlist and its saved songs." busy={busy} onCancel={() => setDeleteTarget(null)} onConfirm={confirmDelete} />}
     {playlists.length > 0 && <label className="playlist-search"><Search size={17} /><span className="sr-only">Search playlists</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search your playlists" /></label>}
     {playlists.length === 0
-      ? <section className="playlist-empty-state"><Disc3 size={34} /><h2>Your library starts here</h2><p className="muted">Create a playlist, then save songs from Explore or your music rooms.</p><button className="btn btn-text" onClick={onBrowse}><Search size={16} /> Explore music</button></section>
+      ? <section className="playlist-empty-state"><Disc3 size={34} /><h2>Your library starts here</h2><p className="muted">Create a playlist, then save songs from Explore or your music rooms.</p><button className="btn btn-text" onClick={onBrowse}><Search size={16} /> Find songs</button></section>
       : visiblePlaylists.length === 0
         ? <p className="empty">No playlists match “{search}”.</p>
         : <div className="playlist-grid">
