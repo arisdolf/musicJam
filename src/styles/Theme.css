@@ -82,21 +82,21 @@ input:focus { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transp
 /* ── Now playing ── */
 .np-card { background: var(--player-bg); animation: sheet-spring 560ms var(--spring) backwards; }
 .np-card > .np-backdrop { opacity: .55; filter: blur(44px) saturate(1.7); }
-.np-art { border-radius: 28px; box-shadow: 0 30px 70px rgba(0,0,0,.55), 0 0 60px rgba(255,70,80,.28); animation: art-in 560ms var(--spring) backwards; }
-.np-lyric-window p.current { text-shadow: 0 0 22px rgba(255,70,80,.55); }
-.np-lyrics-list p.current { background: linear-gradient(90deg, rgba(255,70,80,.28), rgba(255,255,255,.1)); }
-.np-seek::-webkit-slider-runnable-track { background: linear-gradient(to right, #ff4d5a 0, #ffffff var(--pct), rgba(255,255,255,.22) var(--pct)); }
-.np-seek::-moz-range-progress { background: #ff4d5a; }
+.np-art { border-radius: 28px; box-shadow: 0 30px 70px rgba(0,0,0,.55), 0 0 60px rgba(214,40,55,.28); animation: art-in 560ms var(--spring) backwards; }
+.np-lyric-window p.current { text-shadow: 0 0 22px rgba(214,40,55,.55); }
+.np-lyrics-list p.current { background: linear-gradient(90deg, rgba(214,40,55,.28), rgba(255,255,255,.1)); }
+.np-seek::-webkit-slider-runnable-track { background: linear-gradient(to right, #e0343f 0, #ffffff var(--pct), rgba(255,255,255,.22) var(--pct)); }
+.np-seek::-moz-range-progress { background: #e0343f; }
 .np-seek::-webkit-slider-thumb { box-shadow: 0 2px 10px rgba(0,0,0,.5); transition: transform 200ms var(--spring); }
 .np-seek:active::-webkit-slider-thumb { transform: scale(1.4); }
 .np-play { background: var(--spot); color: #fff; box-shadow: var(--glow); }
 .np-play:hover:not(:disabled) { background: var(--spot); transform: scale(1.1); filter: brightness(1.1); }
 .np-card > .np-menu { animation: pop-origin 420ms var(--spring) backwards; }
-.np-queue-list li.current { background: rgba(255,255,255,.12); box-shadow: inset 3px 0 0 #ff4d5a; }
+.np-queue-list li.current { background: rgba(255,255,255,.12); box-shadow: inset 3px 0 0 #e0343f; }
 .np-queue-list li { animation: enter 360ms var(--ease-out) backwards; }
 
 /* ── Queue-add flight: a little record flying to the queue ── */
-.queue-fly { border-radius: 50%; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent), 0 6px 22px rgba(255,70,80,.5); }
+.queue-fly { border-radius: 50%; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent), 0 6px 22px rgba(214,40,55,.5); }
 
 /* ── Playlists ── */
 .playlist-card { border-radius: 20px; }
@@ -116,7 +116,7 @@ input:focus { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transp
 /* ── Now-playing: swap the teal bits for white/red ── */
 .np-circle:hover:not(:disabled), .np-circle.active { background: #fff; color: #1a0b0e; }
 .np-seek:focus-visible { outline-color: #fff; }
-.np-search input:focus { border-color: #ff4d5a; box-shadow: 0 0 0 3px rgba(255,70,80,.28); }
+.np-search input:focus { border-color: #e0343f; box-shadow: 0 0 0 3px rgba(214,40,55,.28); }
 
 /* ── Keyframes ── */
 @keyframes pop-spring   { from { opacity: 0; transform: translateY(26px) scale(.8); } }

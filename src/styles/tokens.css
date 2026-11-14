@@ -1,18 +1,18 @@
 /* Design tokens: colour, sizing and motion. Dark mode only swaps colours.
-   Theme: "Red Carpet" — crisp white, bold red, coral highlights, green = live/ok. */
+   Theme: "Red Carpet" — crisp white, deep crimson on black, coral highlights, green = live/ok. */
 :root {
   color-scheme: light;
-  --bg: #ffffff; --surface: #fdf3f3; --ink: #1a0d0f; --muted: #7a5f63; --line: #f1d9db;
-  --accent: #d91a2b; --accent-dark: #b01220; --accent-hover: #b01220; --accent-soft: #fde8e9;
-  --accent-2: #ff6f61;            /* coral highlight */
+  --bg: #ffffff; --surface: #fcf1f2; --ink: #1f0a0d; --muted: #7a5258; --line: #efd3d6;
+  --accent: #a8111f; --accent-dark: #8a0d19; --accent-hover: #8a0d19; --accent-soft: #fbe6e8;
+  --accent-2: #d4453f;            /* coral highlight */
   --live: #17a05f;                /* "live / ok" green */
-  --danger: #8f1a1a; --danger-hover: #6f1212; --on-danger: #fff; --danger-bg: #fff9f8; --danger-line: #f7c4bf;
-  --scrim: rgba(26,13,15,.5); --player-bg: #1a0b0e;
-  --spot: linear-gradient(135deg, #cf1224, #f2402f);
-  --glow: 0 8px 26px rgba(217,26,43,.32);
+  --danger: #d84315; --danger-hover: #b8360f; --on-danger: #fff; --danger-bg: #fff8f5; --danger-line: #f7cdbd;
+  --scrim: rgba(10,10,10,.55); --player-bg: #0b0b0c;
+  --spot: linear-gradient(135deg, #8f0c1a, #c01f2b);
+  --glow: 0 8px 26px rgba(168,17,31,.34);
   --radius: 10px; --topbar-h: 56px; --nav-h: 60px;
   --bottom-space: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
-  --shadow-pop: 0 14px 40px rgba(120,20,30,.2);
+  --shadow-pop: 0 14px 40px rgba(100,10,20,.22);
   --font-body: "DM Sans", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-display: "Sora", "DM Sans", Inter, system-ui, sans-serif;
 
@@ -31,14 +31,14 @@
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --bg: #140b0d; --surface: #201215; --ink: #fff6f6; --muted: #c7a7ab; --line: #3b2327;
-    --accent: #e5242f; --accent-dark: #ff8a92; --accent-hover: #c81d27; --accent-soft: #3d1519;
-    --accent-2: #ff9e92; --live: #4be39b;
-    --danger: #ffb3a8; --danger-hover: #ffc9c1; --on-danger: #1a0c0a; --danger-bg: #211514; --danger-line: #59302d;
-    --scrim: rgba(10,3,5,.65);
-    --spot: linear-gradient(135deg, #d6182a, #f2402f);
-    --glow: 0 8px 28px rgba(255,70,80,.35);
-    --shadow-pop: 0 18px 50px rgba(0,0,0,.5);
+    --bg: #0a0a0b; --surface: #151516; --ink: #f7f7f7; --muted: #a4a4a8; --line: #2a2a2c;
+    --accent: #c2202f; --accent-dark: #ff8f98; --accent-hover: #a71a27; --accent-soft: #2a1013;
+    --accent-2: #ff8a80; --live: #4be39b;
+    --danger: #ff9b6b; --danger-hover: #ffb08a; --on-danger: #2a0d05; --danger-bg: #2a1410; --danger-line: #6b3320;
+    --scrim: rgba(0,0,0,.72);
+    --spot: linear-gradient(135deg, #9c0f1f, #d02a35);
+    --glow: 0 8px 28px rgba(220,40,55,.4);
+    --shadow-pop: 0 18px 50px rgba(0,0,0,.55);
   }
 }
 /* Reduced motion: nothing travels or scales, fades still play. */
