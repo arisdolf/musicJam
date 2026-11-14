@@ -13,11 +13,12 @@ export function parseSyncedLyrics(value) {
   if (!value) return []
   const lines = []
   const stamp = /\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g
+  const wordStamp = /<\d{1,3}:\d{2}(?:[.:]\d{1,3})?>/g // word-by-word tags some files carry
 
   for (const raw of value.split(/\r?\n/)) {
     const stamps = [...raw.matchAll(stamp)]
     if (!stamps.length) continue // skips [ar:], [ti:] and other tags
-    const text = raw.replace(stamp, '').trim()
+    const text = raw.replace(stamp, '').replace(wordStamp, '').replace(/\s+/g, ' ').trim()
     for (const match of stamps) {
       const fraction = match[3] ? Number(`0.${match[3]}`) : 0
       lines.push({ time: Number(match[1]) * 60 + Number(match[2]) + fraction, text })
@@ -74,6 +75,11 @@ export function parseTrackInfo(rawTitle = '', channel = '') {
 }
 
 // ── Matching ──────────────────────────────────────────────────────────────────
+// How far (seconds) a record's length is from the video's. Infinity = unknown.
+function durationGap(record, track) {
+  return track.duration && record.duration ? Math.abs(record.duration - track.duration) : Infinity
+}
+
 function scoreRecord(record, info, track) {
   const recTitle = normalize(record.trackName || record.name)
   const recArtist = normalize(record.artistName)
@@ -95,11 +101,15 @@ function scoreRecord(record, info, track) {
       (recCompact.includes(wantCompact) || wantCompact.includes(recCompact)))
   if (artistMatches) score += 4
 
-  if (track.duration && record.duration) {
-    const diff = Math.abs(record.duration - track.duration)
-    if (diff <= 3) score += 4
-    else if (diff <= 8) score += 2
-    else if (diff > 25) score -= 3
+  // A different length usually means a different cut (intro, radio edit, live), and then every line
+  // is off by a few seconds. So length agreement counts for a lot.
+  const gap = durationGap(record, track)
+  if (gap !== Infinity) {
+    if (gap <= 2) score += 5
+    else if (gap <= 5) score += 3
+    else if (gap <= 10) score += 1
+    else if (gap > 25) score -= 4
+    else score -= 1
   }
   return score
 }
@@ -107,9 +117,14 @@ function scoreRecord(record, info, track) {
 function pickBest(records, info, track) {
   let best = null
   let bestScore = 6 // needs 7+: title match plus artist or duration agreement
+  let bestGap = Infinity
   for (const record of records) {
     const score = scoreRecord(record, info, track)
-    if (score > bestScore) { best = record; bestScore = score }
+    const gap = durationGap(record, track)
+    // On a tie, the version whose length is closest to the video wins.
+    if (score > bestScore || (best && score === bestScore && gap < bestGap)) {
+      best = record; bestScore = score; bestGap = gap
+    }
   }
   return best
 }
@@ -117,6 +132,25 @@ function pickBest(records, info, track) {
 async function lookup(track, signal) {
   const info = parseTrackInfo(track.title, track.artist)
   if (!info.title) return null
+
+  // Exact lookup first: title + artist + length. LRCLIB only answers with a record whose length is within
+  // a couple of seconds of the video, which is the version that actually lines up. Any failure here just
+  // falls through to the broader search below.
+  if (info.artist && track.duration) {
+    try {
+      const exact = await lrclib('/get', {
+        track_name: info.title,
+        artist_name: info.artist,
+        duration: String(Math.round(track.duration)),
+      }, signal)
+      if (exact && !exact.instrumental && parseSyncedLyrics(exact.syncedLyrics).length) {
+        if (exact.id) recordCache.set(exact.id, exact)
+        return exact
+      }
+    } catch (error) {
+      if (error.name === 'AbortError') throw error
+    }
+  }
 
   const primary = [
     info.artist ? { track_name: info.title, artist_name: info.artist } : { track_name: info.title },

@@ -6,13 +6,26 @@ import { rubberBandAtBounds } from '../utils/motion'
 import AddToPlaylist from './AddToPlaylist'
 import { searchYouTube } from '../services/youtube'
 import {
-  ArrowLeft, Check, ChevronDown, Disc3, ListMusic, Loader, LogIn, Menu, Mic2, Minus, Pause, Play, Plus,
-  Search, Settings, SkipBack, SkipForward, Trash2,
+  ArrowLeft, Check, ChevronDown, Disc3, ListMusic, ListOrdered, Loader, LogIn, Mic2, MicOff, Minus, MoreVertical,
+  Pause, Play, Plus, Repeat1, Search, Settings, Shuffle, SkipBack, SkipForward, Timer, TimerOff, Trash2,
 } from 'lucide-react'
 
 const YOUTUBE_READY_EVENT = 'onYouTubeIframeAPIReady'
 const OFFSET_KEY = 'jamroom:lyric-offset:'
+const SHOW_LYRICS_KEY = 'jamroom:show-lyrics'
+const PLAY_MODE_KEY = 'jamroom:play-mode'
 const LYRIC_TICK_MS = 100
+const LYRIC_LEAD = 0.2     // show each line a touch early, like most lyric apps, so it never feels late
+const OFFSET_STEP = 0.2    // seconds per tap on the timing buttons
+const SLEEP_OPTIONS = [5, 10, 15, 30, 45, 60] // minutes
+const SWIPE_MIN = 50       // px of horizontal travel that counts as a swipe
+
+const MODE_ORDER = ['order', 'repeat', 'shuffle']
+const MODES = {
+  order:   { label: 'Playing in order',    icon: ListOrdered },
+  repeat:  { label: 'Repeating this song', icon: Repeat1 },
+  shuffle: { label: 'Shuffle on',          icon: Shuffle },
+}
 
 // Room sync: how far (seconds) this device may drift from the room clock before we seek.
 const DRIFT_PLAYING = 1.5
@@ -24,6 +37,18 @@ function readOffset(trackId) {
   try { return Number(localStorage.getItem(OFFSET_KEY + trackId)) || 0 } catch { return 0 }
 }
 
+// Lyrics are on unless the listener switched them off.
+function readShowLyrics() {
+  try { return localStorage.getItem(SHOW_LYRICS_KEY) !== '0' } catch { return true }
+}
+
+function readMode() {
+  try {
+    const saved = localStorage.getItem(PLAY_MODE_KEY)
+    return MODES[saved] ? saved : 'order'
+  } catch { return 'order' }
+}
+
 // `sync` is { now() } while a room drives playback (null for local listening). It makes the player
 // follow the room's shared position, so someone joining mid-song lands at the same part.
 export default function PersistentPlayer({ playback, onPlaybackChange, onNavigate, onPlayTrack, onQueueTrack, sync }) {
@@ -33,17 +58,28 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
   const [expanded, setExpanded] = useState(false)
   const [view, setView] = useState('player')        // 'player' | 'queue' | 'search'
   const [lyricsFull, setLyricsFull] = useState(false)
+  const [showLyrics, setShowLyrics] = useState(readShowLyrics)
   const [menuOpen, setMenuOpen] = useState(false)
   const [lyricsState, setLyricsState] = useState({ key: '', record: null, error: '' })
   const [active, setActive] = useState({ key: '', index: -1 })
   const [offsets, setOffsets] = useState({})
+  const [mode, setMode] = useState(readMode)
+  const [modeToast, setModeToast] = useState(null)
+  const [menuPage, setMenuPage] = useState('main') // 'main' | 'timer'
+  const [sleepEnd, setSleepEnd] = useState(null)   // timestamp (ms) when playback stops, or null
+  const [sleepLeft, setSleepLeft] = useState(0)     // seconds remaining
+  const [queueExiting, setQueueExiting] = useState(false)
   const playerHostRef = useRef(null)
   const playerRef = useRef(null)
   const requestedVideoRef = useRef(null)
   const hasPlayedRef = useRef(false)
   const lyricLineRefs = useRef([])
   const lyricsListRef = useRef(null)
-  const callbacksRef = useRef({ playback, onPlaybackChange, sync })
+  const queueTimerRef = useRef(0)
+  const stageRef = useRef(null)
+  const changePlayingRef = useRef(null)
+  const [slideDir, setSlideDir] = useState(null) // which side the next page slides in from
+  const callbacksRef = useRef({ playback, onPlaybackChange, sync, mode })
 
   const playbackQueue = playback.queue
   const playbackCurrent = playback.current
@@ -59,17 +95,115 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
   const art = currentTrackId ? (currentTrackThumbnail || `https://i.ytimg.com/vi/${currentTrackId}/mqdefault.jpg`) : ''
   const lyricsKey = currentTrack ? [currentTrackId, currentTrackLyricsId || '', currentTrackTitle || '', currentTrackArtist || ''].join('|') : ''
   const lyricsRecord = lyricsState.key === lyricsKey ? lyricsState.record : null
-  const lyricsLoading = Boolean(currentTrack && lyricsState.key !== lyricsKey)
+  const lyricsLoading = Boolean(showLyrics && currentTrack && lyricsState.key !== lyricsKey)
   const lyricsError = lyricsState.key === lyricsKey ? lyricsState.error : ''
   const lyricsRecordId = lyricsRecord ? String(lyricsRecord.id) : ''
   const fullOpen = expanded && Boolean(currentTrack)
-  const lyricsOpen = fullOpen && view === 'player' && lyricsFull
-  const lyricLines = useMemo(() => parseSyncedLyrics(lyricsRecord?.syncedLyrics), [lyricsRecord])
+  const lyricsFullOn = showLyrics && lyricsFull
+  const lyricsOpen = fullOpen && view === 'player' && lyricsFullOn
+  // With lyrics switched off there are no lines at all, so nothing syncs, scrolls or shows in the mini bar.
+  const lyricLines = useMemo(() => parseSyncedLyrics(showLyrics ? lyricsRecord?.syncedLyrics : ''), [showLyrics, lyricsRecord])
   const activeLyricIndex = lyricsRecordId && active.key === lyricsRecordId ? active.index : -1
   const lyricOffset = currentTrackId ? (offsets[currentTrackId] ?? readOffset(currentTrackId)) : 0
-  const currentLyricText = activeLyricIndex >= 0 ? lyricLines[activeLyricIndex]?.text : ''
+  const currentLyricText = showLyrics && activeLyricIndex >= 0 ? lyricLines[activeLyricIndex]?.text : ''
 
-  const collapse = useCallback(() => { setExpanded(false); setMenuOpen(false); setView('player') }, [])
+  const collapse = useCallback(() => {
+    setExpanded(false); setMenuOpen(false); setView('player'); setQueueExiting(false)
+  }, [])
+
+  const toggleLyrics = () => {
+    const next = !showLyrics
+    setShowLyrics(next)
+    if (!next) setLyricsFull(false)
+    try { localStorage.setItem(SHOW_LYRICS_KEY, next ? '1' : '0') } catch { /* storage is optional */ }
+  }
+
+  // Cycles order -> repeat -> shuffle and flashes a small pill with the new mode.
+  const cycleMode = () => {
+    const next = MODE_ORDER[(MODE_ORDER.indexOf(mode) + 1) % MODE_ORDER.length]
+    setMode(next)
+    setModeToast({ key: Date.now(), label: MODES[next].label, icon: MODES[next].icon })
+    try { localStorage.setItem(PLAY_MODE_KEY, next) } catch { /* storage is optional */ }
+  }
+
+  const startSleep = (minutes) => {
+    setSleepEnd(Date.now() + minutes * 60000)
+    setSleepLeft(minutes * 60)
+    setModeToast({ key: Date.now(), label: `Sleep timer: ${minutes} min`, icon: Timer })
+    setMenuOpen(false)
+  }
+  const cancelSleep = () => {
+    setSleepEnd(null)
+    setModeToast({ key: Date.now(), label: 'Sleep timer off', icon: TimerOff })
+    setMenuOpen(false)
+  }
+
+  // Queue panel eases in on open and out on close (the view switches after the exit animation).
+  const closeQueue = useCallback(() => {
+    setQueueExiting(true)
+    clearTimeout(queueTimerRef.current)
+    queueTimerRef.current = setTimeout(() => { setView('player'); setQueueExiting(false) }, 220)
+  }, [])
+
+  const toggleQueue = () => {
+    setMenuOpen(false)
+    if (view === 'queue' && !queueExiting) closeQueue()
+    else { clearTimeout(queueTimerRef.current); setQueueExiting(false); setView('queue') }
+  }
+
+  // Swipe the artwork: the page follows your finger, then slides out and the other page slides in.
+  const pageRef = useRef({ showLyrics, lyricsFullOn })
+  useEffect(() => { pageRef.current = { showLyrics, lyricsFullOn } })
+
+  const showPage = (toLyrics) => { setSlideDir(toLyrics ? 'right' : 'left'); setLyricsFull(toLyrics) }
+
+  const startSwipe = (event) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    const stage = stageRef.current
+    if (!stage) return
+    const startX = event.clientX
+    const startY = event.clientY
+    let dragging = false
+    let dx = 0
+    // Left is only allowed from the cover (to lyrics), right only from lyrics (back to cover).
+    const canGo = (delta) => {
+      const page = pageRef.current
+      return delta < 0 ? page.showLyrics && !page.lyricsFullOn : page.lyricsFullOn
+    }
+    const move = (e) => {
+      dx = e.clientX - startX
+      if (!dragging) {
+        if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(e.clientY - startY)) return
+        dragging = true
+      }
+      const pull = canGo(dx) ? dx : dx * 0.25 // rubber band when there is nothing that way
+      stage.style.transition = 'none'
+      stage.style.transform = `translateX(${pull}px)`
+      stage.style.opacity = String(1 - Math.min(Math.abs(pull) / 320, 0.6))
+    }
+    const end = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', end)
+      window.removeEventListener('pointercancel', end)
+      if (!dragging) return
+      const clear = () => { stage.style.transition = ''; stage.style.transform = ''; stage.style.opacity = '' }
+      if (Math.abs(dx) >= SWIPE_MIN && canGo(dx)) {
+        const toLyrics = dx < 0
+        stage.style.transition = 'transform 150ms var(--ease-in-out), opacity 150ms var(--ease-in-out)'
+        stage.style.transform = `translateX(${toLyrics ? -56 : 56}px)`
+        stage.style.opacity = '0'
+        setTimeout(() => { clear(); showPage(toLyrics) }, 140)
+      } else {
+        stage.style.transition = 'transform 320ms var(--ease-in-out), opacity 320ms var(--ease-in-out)'
+        stage.style.transform = ''
+        stage.style.opacity = ''
+        setTimeout(clear, 330)
+      }
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', end)
+    window.addEventListener('pointercancel', end)
+  }
 
   // ── Room sync helpers ──────────────────────────────────────────────────────
   // The real playhead, or undefined if the player has not started (so we never broadcast a fake 0:00).
@@ -123,6 +257,17 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
     requestVideo(track)
   }, [onPlaybackChange, playbackQueue, requestVideo])
 
+  // Index the "next" button should go to (random when shuffle is on).
+  const nextIndex = useCallback(() => {
+    const length = playbackQueue.length
+    if (mode === 'shuffle' && length > 1) {
+      let pick = playbackCurrent
+      while (pick === playbackCurrent) pick = Math.floor(Math.random() * length)
+      return pick
+    }
+    return playbackCurrent + 1
+  }, [mode, playbackQueue.length, playbackCurrent])
+
   const changePlaying = useCallback((playing) => {
     const track = playbackQueue[playbackCurrent]
     if (!track) return
@@ -152,19 +297,19 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
     return { ...state, queue, current, playing: queue.length ? state.playing : false }
   }), [onPlaybackChange])
 
-  const nudgeOffset = (delta) => {
+  const saveOffset = (next) => {
     if (!currentTrackId) return
-    const next = Math.round((lyricOffset + delta) * 10) / 10
     setOffsets((current) => ({ ...current, [currentTrackId]: next }))
     try {
       if (next) localStorage.setItem(OFFSET_KEY + currentTrackId, String(next))
       else localStorage.removeItem(OFFSET_KEY + currentTrackId)
     } catch { /* storage is optional */ }
   }
+  const nudgeOffset = (delta) => saveOffset(Math.round((lyricOffset + delta) * 10) / 10)
 
   const go = (id) => { onNavigate?.(id); collapse() }
 
-  useEffect(() => { callbacksRef.current = { playback, onPlaybackChange, sync } }, [playback, onPlaybackChange, sync])
+  useEffect(() => { callbacksRef.current = { playback, onPlaybackChange, sync, mode } }, [playback, onPlaybackChange, sync, mode])
 
   useEffect(() => {
     if (!fullOpen) return undefined
@@ -176,6 +321,32 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [fullOpen, menuOpen, collapse])
+
+  useEffect(() => { changePlayingRef.current = changePlaying })
+
+  // Sleep timer: counts down, then pauses the music.
+  useEffect(() => {
+    if (!sleepEnd) return undefined
+    const timer = setInterval(() => {
+      const left = Math.ceil((sleepEnd - Date.now()) / 1000)
+      if (left > 0) { setSleepLeft(left); return }
+      setSleepEnd(null)
+      changePlayingRef.current?.(false)
+      setModeToast({ key: Date.now(), label: 'Sleep timer ended. Music paused', icon: Timer })
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [sleepEnd])
+
+  useEffect(() => { if (!menuOpen) setMenuPage('main') }, [menuOpen])
+
+  // Hide the mode pill after its animation finishes.
+  useEffect(() => {
+    if (!modeToast) return undefined
+    const timer = setTimeout(() => setModeToast(null), 1700)
+    return () => clearTimeout(timer)
+  }, [modeToast])
+
+  useEffect(() => () => clearTimeout(queueTimerRef.current), [])
 
   // ── YouTube player (kept alive but hidden: audio only) ─────────────────────
   useEffect(() => {
@@ -222,13 +393,26 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
               // Every device sees the song end. Only advance if the room is still on the song that ended,
               // otherwise a joiner would skip an extra track.
               const endedId = event.target?.getVideoData?.()?.video_id
-              const single = latest.playback.queue.length <= 1
-              latest.onPlaybackChange((state) => {
-                if (endedId && state.queue[state.current]?.id !== endedId) return state
-                return state.queue.length > 1
-                  ? { ...state, current: (state.current + 1) % state.queue.length, playing: true }
-                  : { ...state, playing: false }
-              }, single ? { position: 0 } : undefined)
+              const { queue, current } = latest.playback
+              if (latest.mode === 'repeat') {
+                try { event.target.seekTo(0, true); event.target.playVideo() } catch { /* player not ready */ }
+                latest.onPlaybackChange((state) => state, { position: 0 })
+              } else if (latest.mode === 'shuffle') {
+                latest.onPlaybackChange((state) => {
+                  if (endedId && state.queue[state.current]?.id !== endedId) return state
+                  if (state.queue.length < 2) return { ...state, playing: false }
+                  let next = state.current
+                  while (next === state.current) next = Math.floor(Math.random() * state.queue.length)
+                  return { ...state, current: next, playing: true }
+                }, queue.length < 2 ? { position: 0 } : undefined)
+              } else {
+                latest.onPlaybackChange((state) => {
+                  if (endedId && state.queue[state.current]?.id !== endedId) return state
+                  return state.current < state.queue.length - 1
+                    ? { ...state, current: state.current + 1, playing: true }
+                    : { ...state, playing: false }
+                }, current >= queue.length - 1 ? { position: 0 } : undefined)
+              }
             }
           },
           onError: (event) => {
@@ -318,9 +502,9 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
     return () => clearInterval(timer)
   }, [sync, playerReady, currentTrackId, playbackPlaying, followRoom])
 
-  // ── Lyrics fetch ───────────────────────────────────────────────────────────
+  // ── Lyrics fetch (skipped entirely while lyrics are switched off) ──────────
   useEffect(() => {
-    if (!lyricsKey) return undefined
+    if (!showLyrics || !lyricsKey) return undefined
     const controller = new AbortController()
     getSyncedLyrics({
       id: currentTrackId,
@@ -340,15 +524,28 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
         }
       })
     return () => controller.abort()
-  }, [lyricsKey, currentTrackId, currentTrackLyricsId, currentTrackTitle, currentTrackArtist, currentTrackDuration])
+  }, [showLyrics, lyricsKey, currentTrackId, currentTrackLyricsId, currentTrackTitle, currentTrackArtist, currentTrackDuration])
 
   // ── Lyric sync ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const player = playerRef.current
     if (!playerReady || !player || !lyricLines.length || !lyricsRecordId) return undefined
+
+    // YouTube only refreshes getCurrentTime a few times a second, so reading it directly makes lines
+    // show late and jump. Between refreshes we extend the last reading with a wall clock (only while
+    // playing), and any real change in the reading (seek, buffering, restart) resets that anchor.
+    let anchor = { time: -1, at: 0 }
+    const clock = () => {
+      const raw = Number(player.getCurrentTime?.() || 0)
+      const now = performance.now()
+      if (raw !== anchor.time) anchor = { time: raw, at: now }
+      if (player.getPlayerState?.() !== 1) return raw
+      const rate = Number(player.getPlaybackRate?.()) || 1
+      return anchor.time + Math.min(0.6, (now - anchor.at) / 1000) * rate
+    }
+
     const tick = () => {
-      const time = Number(player.getCurrentTime?.() || 0) - lyricOffset
-      const index = findLyricIndex(lyricLines, time)
+      const index = findLyricIndex(lyricLines, clock() - lyricOffset + LYRIC_LEAD)
       setActive((previous) => previous.key === lyricsRecordId && previous.index === index
         ? previous
         : { key: lyricsRecordId, index })
@@ -378,7 +575,7 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
       play: () => changePlaying(true),
       pause: () => changePlaying(false),
       previoustrack: () => playIndex(playbackCurrent - 1),
-      nexttrack: () => playIndex(playbackCurrent + 1),
+      nexttrack: () => playIndex(nextIndex()),
     }
     for (const [action, handler] of Object.entries(actions)) {
       try { navigator.mediaSession.setActionHandler(action, handler) } catch { /* unsupported action */ }
@@ -388,7 +585,7 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
         try { navigator.mediaSession.setActionHandler(action, null) } catch { /* noop */ }
       }
     }
-  }, [currentTrackId, currentTrackTitle, currentTrackArtist, currentTrackThumbnail, playbackCurrent, changePlaying, playIndex])
+  }, [currentTrackId, currentTrackTitle, currentTrackArtist, currentTrackThumbnail, playbackCurrent, changePlaying, playIndex, nextIndex])
 
   const offsetLabel = `${lyricOffset > 0 ? '+' : ''}${lyricOffset.toFixed(1)}s`
   const lineAt = (index) => (index >= 0 && index < lyricLines.length ? lyricLines[index].text || '♪' : '')
@@ -396,7 +593,11 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
     ? [lineAt(activeLyricIndex - 1), lineAt(activeLyricIndex), lineAt(activeLyricIndex + 1)]
     : ['', '♪', lineAt(0)]
   const canPrev = playbackCurrent > 0
-  const canNext = playbackCurrent < playbackQueue.length - 1
+  const canNext = mode === 'shuffle' ? playbackQueue.length > 1 : playbackCurrent < playbackQueue.length - 1
+  const ModeIcon = MODES[mode].icon
+  const ToastIcon = modeToast?.icon
+  const sleepLabel = `${Math.floor(sleepLeft / 60)}:${String(sleepLeft % 60).padStart(2, '0')}`
+  const queueActive = view === 'queue' && !queueExiting
 
   return <>
     {/* The video lives here, off-screen. Only its audio is used. */}
@@ -414,7 +615,7 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
       <button className="mini-play" onClick={togglePlay} aria-label={playbackPlaying ? 'Pause' : 'Play'}>
         <span key={playbackPlaying ? 'pause' : 'play'} className="motion-icon">{playbackPlaying ? <Pause size={17} /> : <Play size={17} fill="currentColor" />}</span>
       </button>
-      <button className="icon-btn" onClick={() => playIndex(playbackCurrent + 1)} disabled={!canNext} aria-label="Next song"><SkipForward size={17} /></button>
+      <button className="icon-btn" onClick={() => playIndex(nextIndex())} disabled={!canNext} aria-label="Next song"><SkipForward size={17} /></button>
     </div>}
 
     {fullOpen && <div className="np-overlay" role="dialog" aria-modal="true" aria-label="Now playing"
@@ -423,11 +624,21 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
         <div className="np-backdrop" style={{ backgroundImage: `url("${art}")` }} aria-hidden="true" />
 
         <header className="np-top">
-          <button className="np-icon" onClick={view === 'player' ? collapse : () => setView('player')} aria-label={view === 'player' ? 'Close player' : 'Back to player'}>
+          <button
+            className="np-icon"
+            onClick={view === 'player' ? collapse : view === 'queue' ? closeQueue : () => setView('player')}
+            aria-label={view === 'player' ? 'Close player' : 'Back to player'}
+          >
             {view === 'player' ? <ChevronDown size={22} /> : <ArrowLeft size={20} />}
           </button>
           <span className="np-kicker">{view === 'queue' ? 'UP NEXT' : view === 'search' ? 'ADD MUSIC' : 'NOW PLAYING'}</span>
-          <span className="np-top-spacer" />
+          <button
+            className={`np-icon${menuOpen ? ' is-open' : ''}${sleepEnd ? ' has-timer' : ''}`}
+            onClick={() => setMenuOpen((open) => !open)}
+            aria-label="More options"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+          ><MoreVertical size={20} /></button>
         </header>
 
         {view === 'search'
@@ -437,7 +648,7 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
               onQueue={onQueueTrack}
             />
           : view === 'queue'
-            ? <ul className="np-queue-list" onWheel={(event) => rubberBandAtBounds(event.currentTarget, event.deltaY)}>
+            ? <ul className={`np-queue-list ${queueExiting ? 'np-panel-out' : 'np-panel-in'}`} onWheel={(event) => rubberBandAtBounds(event.currentTarget, event.deltaY)}>
                 {playbackQueue.map((track, index) => <li className={index === playbackCurrent ? 'current' : ''} key={`${track.id}-${index}`}>
                   <button className="np-queue-track" onClick={() => playIndex(index)}>
                     <img src={track.thumbnail || `https://i.ytimg.com/vi/${track.id}/mqdefault.jpg`} alt="" />
@@ -446,16 +657,22 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
                   <button className="np-icon small" onClick={() => removeTrack(index)} aria-label={`Remove ${track.title}`}><Trash2 size={15} /></button>
                 </li>)}
               </ul>
-            : <div className="np-body">
-                <div className={`np-stage${lyricsFull ? ' is-lyrics' : ''}`}>
-                  {lyricsFull
+            : <div className={`np-body${showLyrics ? '' : ' no-lyrics'}`}>
+                <div ref={stageRef} className={`np-stage${lyricsFullOn ? ' is-lyrics' : ''}${slideDir ? ` slide-from-${slideDir}` : ''}`} onPointerDown={startSwipe}>
+                  {lyricsFullOn
                     ? <>
                         <div className="np-lyrics-bar">
                           <span>Synced lyrics</span>
                           {lyricLines.length > 0 && <div className="lyric-offset" role="group" aria-label="Adjust lyric timing">
-                            <button onClick={() => nudgeOffset(-0.5)} aria-label="Show lyrics earlier" title="Lyrics late? Show them earlier"><Minus size={13} /></button>
-                            <span title="Lyric timing offset">{offsetLabel}</span>
-                            <button onClick={() => nudgeOffset(0.5)} aria-label="Show lyrics later" title="Lyrics early? Show them later"><Plus size={13} /></button>
+                            <button onClick={() => nudgeOffset(-OFFSET_STEP)} aria-label="Show lyrics earlier" title="Lyrics late? Show them earlier"><Minus size={13} /></button>
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              title="Lyric timing offset. Click to reset."
+                              onClick={() => saveOffset(0)}
+                              onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); saveOffset(0) } }}
+                            >{offsetLabel}</span>
+                            <button onClick={() => nudgeOffset(OFFSET_STEP)} aria-label="Show lyrics later" title="Lyrics early? Show them later"><Plus size={13} /></button>
                           </div>}
                         </div>
                         {lyricsLoading && <p className="np-lyrics-note"><Loader size={15} className="spin" /> Loading lyrics…</p>}
@@ -468,8 +685,13 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
                           >{line.text || '♪'}</p>)}
                         </div>}
                       </>
-                    : <img key={currentTrackId} className="np-art" src={art} alt="" />}
+                    : <img key={currentTrackId} className="np-art" src={art} alt="" draggable={false} />}
                 </div>
+
+                {showLyrics && <div className="np-pager" role="group" aria-label="Cover or lyrics">
+                  <button className={!lyricsFullOn ? 'on' : ''} onClick={() => showPage(false)} aria-label="Show cover art" />
+                  <button className={lyricsFullOn ? 'on' : ''} onClick={() => showPage(true)} aria-label="Show lyrics" />
+                </div>}
 
                 <div className="np-title-row">
                   <div className="np-title">
@@ -479,7 +701,7 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
                   <AddToPlaylist track={currentTrack} />
                 </div>
 
-                {!lyricsFull && <div className="np-lyric-window" aria-live="off">
+                {showLyrics && !lyricsFullOn && <div className="np-lyric-window" aria-live="off">
                   {lyricsLoading
                     ? <p className="current"><Loader size={15} className="spin" /> Loading lyrics…</p>
                     : lyricsError
@@ -491,26 +713,50 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
               </div>}
 
         <footer className="np-controls">
-          <button className={`np-circle${lyricsFull && view === 'player' ? ' active' : ''}`} onClick={() => { setView('player'); setLyricsFull((open) => !open) }} aria-label="Toggle full lyrics" aria-pressed={lyricsFull}><Mic2 size={17} /></button>
+          <button
+            className={`np-circle${mode !== 'order' ? ' active' : ''}`}
+            onClick={cycleMode}
+            aria-label={`${MODES[mode].label}. Tap to change playback mode`}
+          ><ModeIcon size={17} /></button>
           <button className="np-icon" onClick={() => playIndex(playbackCurrent - 1)} disabled={!canPrev} aria-label="Previous song"><SkipBack size={22} fill="currentColor" /></button>
           <button className="np-play" onClick={togglePlay} aria-label={playbackPlaying ? 'Pause' : 'Play'}>
             <span key={playbackPlaying ? 'pause' : 'play'} className="motion-icon">{playbackPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}</span>
           </button>
-          <button className="np-icon" onClick={() => playIndex(playbackCurrent + 1)} disabled={!canNext} aria-label="Next song"><SkipForward size={22} fill="currentColor" /></button>
-          <button className={`np-circle${menuOpen ? ' active' : ''}`} onClick={() => setMenuOpen((open) => !open)} aria-label="More options" aria-haspopup="menu" aria-expanded={menuOpen}><Menu size={17} /></button>
+          <button className="np-icon" onClick={() => playIndex(nextIndex())} disabled={!canNext} aria-label="Next song"><SkipForward size={22} fill="currentColor" /></button>
+          <button className={`np-circle${queueActive ? ' active' : ''}`} onClick={toggleQueue} aria-label="Queue" aria-pressed={queueActive}><ListMusic size={17} /></button>
         </footer>
+
+        {modeToast && <div key={modeToast.key} className="np-toast" role="status">
+          <ToastIcon size={16} /> {modeToast.label}
+        </div>}
 
         {menuOpen && <>
           <div className="np-menu-scrim" onClick={() => setMenuOpen(false)} />
           <div className="np-menu" role="menu">
-            <button role="menuitem" onClick={() => { setView('search'); setMenuOpen(false) }}><Search size={16} /> Add music</button>
-            <button role="menuitem" onClick={() => { setView('queue'); setMenuOpen(false) }}><ListMusic size={16} /> Queue <small>{playbackQueue.length}</small></button>
-            {user
+            {menuPage === 'timer'
               ? <>
-                  <button role="menuitem" onClick={() => go('playlists')}><Disc3 size={16} /> My playlists</button>
-                  <button role="menuitem" onClick={() => go('settings')}><Settings size={16} /> Settings</button>
+                  <button role="menuitem" onClick={() => setMenuPage('main')}><ArrowLeft size={16} /> Sleep timer</button>
+                  {SLEEP_OPTIONS.map((minutes) => <button key={minutes} role="menuitem" onClick={() => startSleep(minutes)}>
+                    <Timer size={16} /> {minutes} minutes
+                  </button>)}
+                  {sleepEnd && <button role="menuitem" onClick={cancelSleep}><TimerOff size={16} /> Turn off timer</button>}
                 </>
-              : <button role="menuitem" onClick={() => { collapse(); openAuth('login') }}><LogIn size={16} /> Log in to save music</button>}
+              : <>
+                  <button role="menuitem" onClick={() => { setView('search'); setMenuOpen(false) }}><Search size={16} /> Add music</button>
+                  <button role="menuitem" onClick={() => setMenuPage('timer')}>
+                    <Timer size={16} /> Sleep timer {sleepEnd && <small>{sleepLabel}</small>}
+                  </button>
+                  <button role="menuitemcheckbox" aria-checked={showLyrics} onClick={toggleLyrics}>
+                    {showLyrics ? <Mic2 size={16} /> : <MicOff size={16} />} Show lyrics
+                    <span className={`np-switch${showLyrics ? ' is-on' : ''}`} aria-hidden="true" />
+                  </button>
+                  {user
+                    ? <>
+                        <button role="menuitem" onClick={() => go('playlists')}><Disc3 size={16} /> My playlists</button>
+                        <button role="menuitem" onClick={() => go('settings')}><Settings size={16} /> Settings</button>
+                      </>
+                    : <button role="menuitem" onClick={() => { collapse(); openAuth('login') }}><LogIn size={16} /> Log in to save music</button>}
+                </>}
           </div>
         </>}
       </section>

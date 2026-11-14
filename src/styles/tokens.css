@@ -17,16 +17,13 @@
   --font-display: "Sora", "DM Sans", Inter, system-ui, sans-serif;
 
   /* motion */
-  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-out: cubic-bezier(.4, 0, .2, 1);
   --ease-in: cubic-bezier(.55, 0, 1, .45);
   --ease-in-out: cubic-bezier(.65, 0, .35, 1);
-  --spring: cubic-bezier(.34, 1.45, .64, 1);
+  --spring: cubic-bezier(.4, 0, .2, 1);   /* name kept for older rules; plain ease in-out, no overshoot */
   --dur-fast: 150ms; --dur: 320ms;
   --shift: 14px;      /* how far things travel on enter */
   --pop: .94;         /* start scale for popups */
-}
-@supports (transition-timing-function: linear(0, 1)) {
-  :root { --spring: linear(0, .009, .035 2.1%, .141, .281 6.7%, .723 12.9%, .938 16.7%, 1.017, 1.077, 1.121, 1.149 24.3%, 1.159, 1.163, 1.161, 1.154 29.9%, 1.129 32.8%, 1.051 39.6%, 1.017 43.1%, .991, .977 51%, .974 53.8%, .975 57.1%, .997 69.8%, 1.003 76.9%, 1); }
 }
 @media (prefers-color-scheme: dark) {
   :root {
