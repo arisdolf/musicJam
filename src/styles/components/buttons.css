@@ -1,0 +1,25 @@
+/* Buttons: press feel, variants, icon buttons. */
+button:not(:disabled) { transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), transform 200ms var(--spring); }
+button:active:not(:disabled) { transform: scale(.95); transition-duration: 60ms; }
+.btn { height: 42px; padding: 0 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); font-weight: 600; font-size: 14px; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 7px; touch-action: manipulation; }
+.btn:hover:not(:disabled) { background: var(--surface); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-text { border-color: transparent; background: none; }
+.btn-small { height: 34px; padding: 0 12px; font-size: 13px; border-radius: 8px; }
+.btn-large { height: 52px; width: 100%; font-size: 15px; border-radius: 12px; }
+.btn-block { width: 100%; height: 44px; }
+.btn-google { gap: 10px; }
+.btn-danger { background: var(--danger); border-color: var(--danger); color: var(--on-danger); }
+.btn-danger:hover:not(:disabled) { background: var(--danger-hover); border-color: var(--danger-hover); }
+.danger-text { color: var(--danger); }
+.link { border: 0; background: none; padding: 0; color: var(--accent-dark); font-weight: 600; text-decoration: underline; }
+.icon-btn { width: 36px; height: 36px; flex-shrink: 0; border: 0; border-radius: 50%; background: none; color: var(--muted); display: grid; place-items: center; touch-action: manipulation; }
+.icon-btn:hover:not(:disabled) { background: var(--surface); color: var(--ink); }
+.icon-btn.active { background: var(--accent-soft); color: var(--accent-dark); }
+.add-btn { background: var(--accent-soft); color: var(--accent-dark); }
+.add-btn:hover:not(:disabled) { background: var(--accent); color: #fff; }
+.save-track-btn:hover:not(:disabled) { color: var(--danger); }
+.save-track-btn.is-saved { color: var(--danger); }
+.motion-icon { display: grid; place-items: center; animation: pop-in 220ms var(--spring) backwards; }
+.motion-success { animation: pulse 420ms var(--ease-out) backwards; }

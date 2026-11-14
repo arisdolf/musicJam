@@ -1,0 +1,6 @@
+/* Landing: create or join a room. */
+.home { padding-top: 56px; }
+.home > .muted { margin: 0 0 28px; }
+.home-icon { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 18px; border-radius: 14px; color: var(--accent-dark); background: var(--accent-soft); }
+.inline-form { display: flex; gap: 8px; margin: 20px 0 8px; }
+@media (max-width: 480px) { .home { padding-top: 32px; } }

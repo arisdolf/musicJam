@@ -1,0 +1,25 @@
+/* Slide-in drawer on phones, sticky sidebar on desktop. */
+.sidenav { position: fixed; inset: 0 auto 0 0; z-index: 100; width: 260px; display: flex; flex-direction: column; background: var(--bg); border-right: 1px solid var(--line); transform: translateX(-100%); visibility: hidden; transition: transform 320ms var(--ease-out), visibility 0s linear 320ms; }
+.sidenav-open { transform: none; visibility: visible; transition-delay: 0s; }
+.sidenav-backdrop { position: fixed; inset: 0; z-index: 99; background: rgba(0,0,0,.35); animation: fade-in 240ms var(--ease-out) backwards; }
+.sidenav-logo { height: var(--topbar-h); padding: 0 16px; flex-shrink: 0; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); font-size: 17px; font-weight: 700; letter-spacing: -.4px; }
+.sidenav-logo-text { flex: 1; }
+.sidenav-close { width: 36px; height: 36px; border: 0; background: none; border-radius: 8px; display: grid; place-items: center; color: var(--muted); }
+.sidenav-close:hover { background: var(--surface); }
+.sidenav-nav { list-style: none; margin: 0; padding: 10px 8px; flex: 1; overflow-y: auto; }
+.sidenav-item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 12px; border: 0; background: none; border-radius: 10px; font-size: 14px; font-weight: 500; text-align: left; color: var(--muted); transition: background var(--dur-fast), color var(--dur-fast), transform var(--dur-fast) var(--ease-out); }
+.sidenav-item:hover { background: var(--surface); color: var(--ink); transform: translateX(3px); }
+.sidenav-item.active { background: var(--accent-soft); color: var(--accent-dark); font-weight: 700; }
+.sidenav-footer { padding: 12px 10px; border-top: 1px solid var(--line); flex-shrink: 0; }
+.sidenav-user { display: flex; align-items: center; gap: 10px; padding: 6px 4px; }
+.sidenav-avatar { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; background: var(--accent-soft); color: var(--accent-dark); font-weight: 700; display: grid; place-items: center; }
+.sidenav-user-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.sidenav-user-info strong, .sidenav-user-info small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidenav-user-info strong { font-size: 13px; }
+.sidenav-user-info small { font-size: 11px; color: var(--muted); }
+.sidenav-auth-btns { display: flex; flex-direction: column; gap: 8px; }
+
+@media (min-width: 768px) {
+  .sidenav { position: sticky; top: 0; height: 100vh; height: 100dvh; flex-shrink: 0; transform: none; visibility: visible; transition: none; }
+  .sidenav-backdrop, .sidenav-close { display: none; }
+}

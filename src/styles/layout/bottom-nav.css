@@ -1,0 +1,8 @@
+/* Phone-only tab bar. */
+.bottom-nav { position: fixed; inset: auto 0 0 0; z-index: 50; height: var(--bottom-space); padding-bottom: env(safe-area-inset-bottom, 0px); display: flex; background: var(--bg); border-top: 1px solid var(--line); }
+.bottom-nav-item { flex: 1; min-width: 0; padding: 6px 4px 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 0; background: none; font-size: 10px; font-weight: 500; color: var(--muted); transition: color var(--dur-fast); }
+.bottom-nav-item svg { display: block; transition: transform 300ms var(--spring); }
+.bottom-nav-item.active { color: var(--accent); }
+.bottom-nav-item.active svg { transform: translateY(-2px) scale(1.12); }
+
+@media (min-width: 768px) { .bottom-nav { display: none; } }

@@ -1,0 +1,137 @@
+/* Red Carpet theme. Loaded LAST (after mobile.css) so it layers over the component files.
+   Colours come from tokens.css; delete this file to get the plain look back. */
+
+/* ── Type + stage lighting ── */
+:root { font-family: var(--font-body); }
+h1, h2, .sidenav-logo, .topbar-logo, .np-title strong, .recent-code, .quota-total strong { font-family: var(--font-display); }
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(60vw 40vw at 90% -10%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
+    radial-gradient(50vw 40vw at -10% 110%, color-mix(in srgb, var(--live) 10%, transparent), transparent 70%);
+}
+.eyebrow { color: var(--accent-2); }
+
+/* ── Buttons, logo, icons ── */
+.btn-primary { background: var(--spot); border-color: transparent; box-shadow: var(--glow); }
+.btn-primary:hover:not(:disabled) { background: var(--spot); border-color: transparent; filter: brightness(1.1); box-shadow: 0 12px 32px color-mix(in srgb, var(--accent) 50%, transparent); }
+.btn:hover:not(:disabled) { transform: translateY(-2px); }
+.btn:active:not(:disabled) { transform: scale(.95); }
+.logo-mark, .page-icon, .sidenav-avatar { background: var(--spot); color: #fff; box-shadow: var(--glow); }
+.add-btn:hover:not(:disabled) { background: var(--accent); color: #fff; }
+.save-track-btn.is-saved svg { animation: heart-pop 520ms var(--spring); }
+.icon-btn:hover:not(:disabled) { transform: scale(1.12); }
+.icon-btn:active:not(:disabled) { transform: scale(.88); }
+input:focus { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent); }
+
+/* ── Navigation ── */
+.sidenav-item.active { box-shadow: inset 3px 0 0 var(--accent); }
+.sidenav-item.active svg { color: var(--accent); }
+.bottom-nav { background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(16px); }
+.bottom-nav-item.active svg { animation: heart-pop 460ms var(--spring); }
+.topbar { background: color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter: blur(14px); }
+
+/* ── Home ── */
+.home-icon { width: 64px; height: 64px; border-radius: 50%; background: var(--spot); color: #fff; box-shadow: var(--glow); animation: pulse-ring 2.8s ease-in-out infinite; }
+.home-icon svg { width: 28px; height: 28px; }
+
+/* ── Pop-ups: modals, feedback cards, popover ── */
+.overlay, .feedback-overlay, .np-overlay { backdrop-filter: blur(8px); }
+.modal::before, .feedback-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 4px; border-radius: inherit; border-bottom-left-radius: 0; border-bottom-right-radius: 0; background: var(--spot); }
+.modal { animation: sheet-spring 520ms var(--spring) backwards; }
+@media (min-width: 520px) { .modal { animation: pop-spring 520ms var(--spring) backwards; } }
+.feedback-card { animation: pop-spring 520ms var(--spring) backwards; }
+.auth-icon, .feedback-icon { background: var(--spot); color: #fff; animation: heart-pop 620ms 120ms var(--spring) backwards; }
+.danger-icon { background: var(--danger); color: var(--on-danger); }
+.modal-close:hover:not(:disabled) { transform: rotate(90deg) scale(1.1); }
+.popover { border-radius: 18px; }
+.popover-enter { animation: pop-origin 420ms var(--spring) backwards; }
+.popover-item:hover:not(:disabled) { transform: translateX(3px); }
+.popover-item[aria-checked="true"] .popover-check { background: var(--accent); color: #fff; animation: heart-pop 420ms var(--spring); }
+.popover-status { color: var(--accent-dark); }
+.popover-status.error { color: var(--danger); }
+.motion-success { animation: toast-in 460ms var(--spring) backwards; }
+.motion-icon { animation: icon-swap 340ms var(--spring) backwards; }
+
+/* ── Tracks ── */
+.track.active { box-shadow: inset 3px 0 0 var(--accent); }
+.track.active .track-text strong { color: var(--accent-dark); }
+.track-play { transition: transform 250ms var(--spring), color 150ms; }
+.track-play:hover:not(:disabled) { transform: scale(1.2); color: var(--accent); }
+.queue-track.active::after { /* live equalizer bars: shows what is playing */
+  content: ""; order: 9; width: 16px; height: 14px; flex: none; margin: 0 6px;
+  background:
+    linear-gradient(var(--accent), var(--accent)) 0 100% / 3px 100% no-repeat,
+    linear-gradient(var(--accent-2), var(--accent-2)) 6px 100% / 3px 100% no-repeat,
+    linear-gradient(var(--live), var(--live)) 12px 100% / 3px 100% no-repeat;
+  animation: eq 1s ease-in-out infinite;
+}
+
+/* ── Room status ── */
+.dot-connected { background: var(--live); animation: live 1.6s infinite; }
+.chip { transition: transform 250ms var(--spring), background-color 150ms; }
+.chip:hover { transform: scale(1.08) rotate(-2deg); }
+
+/* ── Mini player ── */
+.mini-player { background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(20px); border-radius: 22px; box-shadow: var(--shadow-pop), 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent); animation: mini-rise 560ms var(--spring) backwards; }
+.mini-open img { border-radius: 14px; box-shadow: 0 4px 14px rgba(0,0,0,.3); }
+.mini-copy small { color: var(--accent-dark); }
+.mini-play { background: var(--spot); box-shadow: var(--glow); }
+.mini-play:hover:not(:disabled) { background: var(--spot); filter: brightness(1.1); transform: scale(1.1); }
+
+/* ── Now playing ── */
+.np-card { background: var(--player-bg); animation: sheet-spring 560ms var(--spring) backwards; }
+.np-card > .np-backdrop { opacity: .55; filter: blur(44px) saturate(1.7); }
+.np-art { border-radius: 28px; box-shadow: 0 30px 70px rgba(0,0,0,.55), 0 0 60px rgba(255,70,80,.28); animation: art-in 560ms var(--spring) backwards; }
+.np-lyric-window p.current { text-shadow: 0 0 22px rgba(255,70,80,.55); }
+.np-lyrics-list p.current { background: linear-gradient(90deg, rgba(255,70,80,.28), rgba(255,255,255,.1)); }
+.np-seek::-webkit-slider-runnable-track { background: linear-gradient(to right, #ff4d5a 0, #ffffff var(--pct), rgba(255,255,255,.22) var(--pct)); }
+.np-seek::-moz-range-progress { background: #ff4d5a; }
+.np-seek::-webkit-slider-thumb { box-shadow: 0 2px 10px rgba(0,0,0,.5); transition: transform 200ms var(--spring); }
+.np-seek:active::-webkit-slider-thumb { transform: scale(1.4); }
+.np-play { background: var(--spot); color: #fff; box-shadow: var(--glow); }
+.np-play:hover:not(:disabled) { background: var(--spot); transform: scale(1.1); filter: brightness(1.1); }
+.np-card > .np-menu { animation: pop-origin 420ms var(--spring) backwards; }
+.np-queue-list li.current { background: rgba(255,255,255,.12); box-shadow: inset 3px 0 0 #ff4d5a; }
+.np-queue-list li { animation: enter 360ms var(--ease-out) backwards; }
+
+/* ── Queue-add flight: a little record flying to the queue ── */
+.queue-fly { border-radius: 50%; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent), 0 6px 22px rgba(255,70,80,.5); }
+
+/* ── Playlists ── */
+.playlist-card { border-radius: 20px; }
+.playlist-card:hover { transform: translateY(-5px) rotate(-.5deg); }
+.playlist-card-play { opacity: 0; transform: translateY(8px) scale(.6); }
+.playlist-card:hover .playlist-card-play, .playlist-card-open:focus-visible .playlist-card-play { opacity: 1; transform: none; background: var(--spot); color: #fff; box-shadow: var(--glow); }
+.playlist-detail-hero { background: linear-gradient(125deg, color-mix(in srgb, var(--accent) 18%, var(--bg)), var(--bg) 72%); }
+.playlist-empty-state > svg { animation: spin 9s linear infinite; }
+.import-progress span { background: var(--spot); }
+
+/* ── Quota + settings ── */
+.quota-bar span { transform-origin: left; animation: grow 900ms var(--ease-out) backwards; }
+.quota-card.is-ok .quota-bar span { background: var(--live); }
+.quota-card.is-ok .quota-badge { background: color-mix(in srgb, var(--live) 18%, transparent); color: var(--live); }
+.appearance-status-dot { background: var(--live); animation: live 1.6s infinite; }
+
+/* ── Now-playing: swap the teal bits for white/red ── */
+.np-circle:hover:not(:disabled), .np-circle.active { background: #fff; color: #1a0b0e; }
+.np-seek:focus-visible { outline-color: #fff; }
+.np-search input:focus { border-color: #ff4d5a; box-shadow: 0 0 0 3px rgba(255,70,80,.28); }
+
+/* ── Keyframes ── */
+@keyframes pop-spring   { from { opacity: 0; transform: translateY(26px) scale(.8); } }
+@keyframes pop-origin   { from { opacity: 0; transform: scale(.5); } }
+@keyframes sheet-spring { from { opacity: 0; transform: translateY(70px) scale(.96); } }
+@keyframes mini-rise    { from { opacity: 0; transform: translateY(44px) scale(.92); } }
+@keyframes art-in       { from { opacity: 0; transform: scale(.8) rotate(-4deg); } }
+@keyframes heart-pop    { 0% { transform: scale(.4); } 55% { transform: scale(1.35); } 100% { transform: scale(1); } }
+@keyframes icon-swap    { from { opacity: 0; transform: scale(.4) rotate(-40deg); } }
+@keyframes toast-in     { from { opacity: 0; transform: translateY(10px) scale(.9); } }
+@keyframes grow         { from { transform: scaleX(0); } }
+@keyframes live         { from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 70%, transparent); } to { box-shadow: 0 0 0 9px transparent; } }
+@keyframes pulse-ring   { 50% { box-shadow: var(--glow), 0 0 0 12px color-mix(in srgb, var(--accent) 16%, transparent), 0 0 0 26px color-mix(in srgb, var(--accent) 5%, transparent); } }
+@keyframes eq           { 0%, 100% { clip-path: inset(40% 0 0 0); } 33% { clip-path: inset(0 0 0 0); } 66% { clip-path: inset(65% 0 0 0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .queue-track.active::after, .home-icon, .dot-connected, .appearance-status-dot, .playlist-empty-state > svg { animation: none; }
+}

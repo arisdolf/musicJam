@@ -1,0 +1,10 @@
+/* Inputs, fields and inline messages. */
+input:where(:not([type="checkbox"]):not([type="radio"])) { height: 44px; width: 100%; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); font-size: 14px; appearance: none; transition: border-color var(--dur-fast), box-shadow var(--dur-fast); }
+input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+input::placeholder { color: var(--muted); }
+input[readonly] { background: var(--surface); color: var(--muted); }
+.field { display: block; font-size: 13px; font-weight: 600; margin-bottom: 14px; }
+.field input { margin-top: 6px; font-weight: 400; }
+.form-error { color: var(--danger); font-size: 13px; margin: 4px 0 10px; animation: enter 240ms var(--ease-out) backwards; }
+.divider { display: flex; align-items: center; gap: 12px; margin: 20px 0 8px; color: var(--muted); font-size: 13px; }
+.divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }

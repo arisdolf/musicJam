@@ -1,0 +1,23 @@
+/* Phone-only polish, loaded last so it can adjust any page.
+   Centres the landing hero and page headers; delete a rule here to undo it. */
+@media (max-width: 767px) {
+  /* Landing hero */
+  .home { text-align: center; }
+  .home-icon { margin-inline: auto; }
+  .inline-form input { text-align: center; }
+
+  /* Page headers: icon above title, both centred */
+  .explore-header,
+  .playlist-page-heading { flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+  .explore-header > svg { margin-top: 0; }
+  .settings-page h1 { text-align: center; }
+
+  /* Playlist detail hero */
+  .playlist-detail-hero { align-items: center; text-align: center; }
+  .playlist-detail-actions,
+  .playlist-title-row,
+  .playlist-rename-form { justify-content: center; }
+
+  /* Quota summary */
+  .quota-total { align-items: center; text-align: center; }
+}

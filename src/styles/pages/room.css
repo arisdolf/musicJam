@@ -1,0 +1,16 @@
+/* Inside a room: status bar, share chip, "from your playlists". */
+.page.room { padding: 16px 12px 48px; }
+.room-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.room-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 13px; color: var(--muted); }
+.dot { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; background: #c9a227; }
+.dot-connected { background: var(--accent); }
+.dot-local { background: #b0b4b8; }
+.chip { padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); font-size: 12px; font-weight: 700; letter-spacing: .5px; display: inline-flex; align-items: center; gap: 4px; }
+.chip:hover { background: var(--surface); }
+
+.room-playlists { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.room-playlist { border-bottom: 1px solid var(--line); }
+.room-playlist:last-child { border-bottom: 0; }
+.room-playlist > .track { border-bottom: 0; }
+.room-playlist-tracks { margin: 0 0 8px 14px; border-left: 2px solid var(--line); }
+.room-playlist-tracks .track:last-child { border-bottom: 0; }

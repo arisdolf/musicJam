@@ -1,17 +1,21 @@
 // src/services/youtube.js
 import { findLyricsForTrack } from './lyrics'
 
-// src/services/youtube.js
-const API = 'https://www.googleapis.com/youtube/v3'
 const REGION = 'PH'
 const CACHE_TTL = 10 * 60 * 1000
 const KEYS = (import.meta.env.VITE_YOUTUBE_API_KEYS || import.meta.env.VITE_YOUTUBE_API_KEY || '')
   .split(',').map((key) => key.trim()).filter(Boolean)
+// With no keys in the browser env the server picks the key, so we track it as one "Server key".
+const KEY_COUNT = Math.max(KEYS.length, 1)
 const QUOTA_REASONS = ['quotaExceeded', 'dailyLimitExceeded', 'RESOURCE_EXHAUSTED']
 
+// ── Quota tracking (local to this browser) ────────────────────────────────────
 export const QUOTA_LIMIT = 10000
 const COSTS = { search: 100, videos: 1 }
 const USAGE_KEY = 'jamroom:yt-usage'
+
+// YouTube quotas reset at midnight Pacific time, so "exhausted" only lasts for that day.
+const pacificDay = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date())
 
 function readUsage() {
   try {
@@ -39,11 +43,11 @@ function markFull(index) {
 
 export function quotaStatus() {
   const { used } = readUsage()
-  return KEYS.map((key, i) => ({
-    label: `Key ${i + 1}`,
-    hint: key.slice(-4),
+  return Array.from({ length: KEY_COUNT }, (_, i) => ({
+    label: KEYS.length ? `Key ${i + 1}` : 'Server key',
+    hint: KEYS[i] ? KEYS[i].slice(-4) : '',
     used: used[i] || 0,
-    remaining: QUOTA_LIMIT - (used[i] || 0),
+    remaining: Math.max(0, QUOTA_LIMIT - (used[i] || 0)),
   }))
 }
 
@@ -58,18 +62,19 @@ export function msUntilReset() {
   return (86400 - (get('hour') * 3600 + get('minute') * 60 + get('second'))) * 1000
 }
 
-
-// YouTube quotas reset at midnight Pacific time, so "exhausted" only lasts for that day.
-const pacificDay = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date())
-
+// First key that still has room and has not failed for this request. If every key looks full locally
+// we still try the untried ones: the local counter is per browser, the real quota is shared.
+function pickKey(tried) {
+  const { used } = readUsage()
+  const open = Array.from({ length: KEY_COUNT }, (_, i) => i).filter((i) => !tried.has(i))
+  return open.find((i) => (used[i] || 0) < QUOTA_LIMIT) ?? open[0] ?? -1
+}
 
 const cache = new Map()
 
 export function searchYouTube(query, signal) {
   return searchMusic(query, { signal, limit: 10, order: 'relevance' })
 }
-
-
 
 // ── Song vs. random video ─────────────────────────────────────────────────────
 // Hard no: things that are clearly not a song.
@@ -128,7 +133,7 @@ function searchMusic(query, { signal, limit, order }) {
 }
 
 // Looks up lyrics per track (6 at a time) and keeps the first `limit` that have them.
-async function withLyrics(candidates, limit, signal) {
+export async function withLyrics(candidates, limit, signal) {
   const found = new Array(candidates.length).fill(null)
   let next = 0, hits = 0, attempted = 0, failures = 0
 
@@ -157,15 +162,32 @@ async function withLyrics(candidates, limit, signal) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+// Every request goes through the /api/youtube proxy. We tell it which key to use (keyIndex), count the
+// cost once it succeeds, and when a key runs out we mark it full and retry on the next one.
 async function yt(path, params, signal) {
-  const response = await fetch(`/api/youtube?${new URLSearchParams({ path, ...params })}`, { signal })
-  const data = await response.json().catch(() => ({}))
-  if (response.ok) return data
+  const cost = COSTS[path] ?? 1
+  const tried = new Set()
+  let failure = null
 
-  const reason = data.error?.errors?.[0]?.reason || data.error?.status || ''
-  const error = new Error(friendlyError(reason, data.error?.message))
-  error.reason = reason
-  throw error
+  for (;;) {
+    const index = pickKey(tried)
+    if (index < 0) throw failure
+    tried.add(index)
+
+    const query = new URLSearchParams({ path, ...params })
+    if (KEYS.length) query.set('keyIndex', String(index))
+    const response = await fetch(`/api/youtube?${query}`, { signal })
+    const data = await response.json().catch(() => ({}))
+
+    if (response.ok) { addUsage(index, cost); return data }
+
+    const reason = data.error?.errors?.[0]?.reason || data.error?.status || ''
+    const error = new Error(friendlyError(reason, data.error?.message))
+    error.reason = reason
+    if (!QUOTA_REASONS.includes(reason)) throw error
+    markFull(index)
+    failure = error
+  }
 }
 
 function friendlyError(reason, fallback) {

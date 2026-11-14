@@ -1,0 +1,18 @@
+/* Settings cards. */
+.settings-page { width: min(100%, 560px); margin: 0 auto; padding: 28px 16px 64px; }
+.settings-page h1 { font-size: 28px; letter-spacing: -.6px; margin: 0 0 24px; }
+.settings-card { margin-bottom: 16px; padding: 18px 16px; border: 1px solid var(--line); border-radius: 14px; animation: enter 380ms var(--ease-out) backwards; }
+.settings-card:nth-of-type(2) { animation-delay: 40ms; }
+.settings-card:nth-of-type(3) { animation-delay: 80ms; }
+.settings-card:nth-of-type(n+4) { animation-delay: 120ms; }
+.settings-card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.settings-card-header h2 { font-size: 15px; font-weight: 700; margin: 0; }
+.settings-desc { font-size: 13px; color: var(--muted); margin: 0 0 14px; }
+.appearance-status { display: inline-flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-dark); font-size: 12px; font-weight: 700; }
+.appearance-status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.danger-card { border-color: var(--danger-line); background: var(--danger-bg); }
+.danger-card .settings-card-header { color: var(--danger); }
+@media (max-width: 480px) {
+  .settings-page { padding: 20px 12px 48px; }
+  .settings-page h1 { font-size: 24px; }
+}

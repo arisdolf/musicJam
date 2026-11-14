@@ -1,0 +1,42 @@
+/* "Save to playlist" popover (desktop) / bottom sheet (phone). Placement comes from AddToPlaylist.jsx. */
+.popover-wrap { position: relative; }
+.popover-scrim { position: fixed; inset: 0; z-index: 149; background: transparent; }
+.popover { position: fixed; z-index: 150; width: min(260px, calc(100vw - 24px)); max-height: min(70dvh, 440px); overflow-y: auto; overscroll-behavior: contain; padding: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-pop); }
+.popover-enter { animation: pop-in 320ms var(--spring) backwards; }
+.popover-exit { animation: popover-exit 140ms var(--ease-in) forwards; pointer-events: none; }
+
+.popover-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; padding: 4px 4px 10px; border-bottom: 1px solid var(--line); }
+.popover-head img { width: 44px; height: 32px; flex: 0 0 auto; object-fit: cover; border-radius: 6px; background: var(--surface); }
+.popover-head > div { display: flex; flex-direction: column; min-width: 0; }
+.popover-head small { color: var(--muted); font-size: 11px; }
+.popover-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+
+.popover-state { display: flex; align-items: center; gap: 8px; margin: 8px 6px; color: var(--muted); font-size: 13px; }
+.popover-login { flex-direction: column; align-items: stretch; gap: 8px; margin: 8px 2px 4px; }
+.popover-login p { margin: 0 0 2px; }
+.popover-list { max-height: 220px; overflow-y: auto; overscroll-behavior: contain; }
+
+.popover-item { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 0; background: none; padding: 9px 8px; border-radius: 8px; font-size: 13px; text-align: left; }
+.popover-item:hover:not(:disabled) { background: var(--surface); }
+.popover-item:disabled { opacity: 1; color: var(--muted); cursor: default; }
+.popover-item-copy { display: flex; flex-direction: column; min-width: 0; }
+.popover-item-copy > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.popover-item-copy small { color: var(--muted); font-size: 11px; }
+.popover-check { width: 22px; height: 22px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; background: var(--surface); color: var(--muted); }
+.popover-item[aria-checked="true"] .popover-check { background: var(--accent); color: #fff; }
+
+.popover-new { display: flex; gap: 6px; margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+.popover-new input { height: 34px; font-size: 13px; }
+.popover-status { margin: 8px 6px 2px; color: var(--accent-dark); font-size: 12px; }
+.popover-status.error { color: var(--danger); }
+
+@media (max-width: 480px) {
+  .popover-scrim { background: var(--scrim); animation: fade-in 220ms var(--ease-out) backwards; }
+  .popover-scrim.is-closing { animation: fade-out 140ms var(--ease-in) forwards; }
+  .popover { z-index: 160; padding: 12px; border-radius: 18px; box-shadow: 0 18px 52px rgba(0,0,0,.24); }
+  .popover-head { padding: 4px 2px 12px; }
+  .popover-head strong { font-size: 14px; }
+  .popover-item { min-height: 44px; }
+  .popover-new { flex-direction: column; }
+  .popover-new input, .popover-new .btn { width: 100%; min-height: 40px; }
+}

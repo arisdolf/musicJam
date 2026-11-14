@@ -1,0 +1,24 @@
+/* Explore / popular-songs styles. No page uses these right now; kept for when Explore returns. */
+.section-label { margin: 0 0 12px; font-size: 14px; }
+.category-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-bottom: 28px; }
+.category-chip { display: flex; align-items: center; gap: 9px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); font-size: 13px; font-weight: 600; text-align: left; touch-action: manipulation; }
+.category-chip:hover { background: var(--surface); }
+.category-chip.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-dark); }
+.category-chip svg { color: var(--accent-dark); }
+.popular-section { margin: 4px 0 30px; padding: 18px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
+.popular-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.popular-heading h2 { margin: 4px 0 0; font-size: 20px; letter-spacing: -.4px; }
+.popular-heading-icon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: var(--accent-soft); color: var(--accent-dark); animation: pop-in 360ms var(--spring) backwards; }
+.popular-subtitle { margin: 4px 0 12px; font-size: 13px; }
+.popular-track-list { border: 1px solid var(--line); border-radius: 12px; background: var(--bg); overflow: hidden; }
+.popular-track-list .track { padding: 9px 10px; }
+.popular-track-list .track img { width: 64px; height: 46px; border-radius: 8px; }
+.popular-rank { width: 26px; flex: 0 0 26px; color: var(--muted); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; }
+.popular-views { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 11px; white-space: nowrap; }
+.explore-loading { display: flex; align-items: center; gap: 10px; padding: 8px 0; color: var(--muted); font-size: 14px; }
+@media (max-width: 480px) {
+  .category-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+  .popular-section { padding: 14px 10px; }
+  .popular-views { display: none; }
+  .popular-track-list .track img { width: 48px; height: 36px; }
+}

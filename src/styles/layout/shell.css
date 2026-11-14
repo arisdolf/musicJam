@@ -1,0 +1,23 @@
+/* App frame: sidebar + content column, the keyed route animation and page wrappers. */
+.app-shell { display: flex; min-height: 100vh; min-height: 100dvh; }
+.app-content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.app-body { flex: 1; padding-bottom: var(--bottom-space); }
+/* Room for the mini player when something is queued. */
+.has-player .app-body { padding-bottom: calc(var(--bottom-space) + 84px); }
+
+/* route-stage is keyed in App.jsx, so it remounts on every tab change and replays this. */
+.route-stage { width: 100%; animation: enter var(--dur) var(--ease-out) backwards; }
+
+.page { width: min(100%, 640px); margin: 0 auto; padding: 28px 16px 48px; }
+.page.narrow { width: min(100%, 520px); }
+.page h1 { font-size: 28px; line-height: 1.2; letter-spacing: -.6px; margin: 0 0 8px; }
+.page h2 { font-size: 16px; margin: 0 0 12px; }
+
+@media (min-width: 768px) {
+  .app-body { padding-bottom: 0; }
+  .has-player .app-body { padding-bottom: 92px; }
+}
+@media (max-width: 480px) {
+  .page { padding: 20px 12px 48px; }
+  .page h1 { font-size: 24px; }
+}

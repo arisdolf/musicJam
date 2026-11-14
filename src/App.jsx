@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
 import { AccountProvider } from './features/account/AccountContext'
 import { PlaybackProvider, usePlayback } from './features/playback/PlaybackContext'
 import { useRoom } from './features/rooms/useRoom'
@@ -28,13 +28,13 @@ function Shell() {
     playTracks: playLocalTracks,
     startVideo,
   } = usePlayback()
-  const [view, setView]           = useState('home')   // 'home'|'playlists'|'explore'|'recent'|'settings'
+  const [view, setView]           = useState('home')   // 'home'|'playlists'|'quota'|'recent'|'settings'
   const [roomCode, setRoomCode]   = useState(() => new URLSearchParams(window.location.search).get('room')?.toUpperCase() || '')
   const [navOpen, setNavOpen]     = useState(false)
   const [queueFly, setQueueFly]   = useState(null)
   const queueFlyCounter = useRef(0)
 
-  const { room, updateRoom, connection, members } = useRoom(roomCode)
+  const { room, updateRoom, connection, members, serverNow } = useRoom(roomCode)
   const roomQueue = room.queue
   const roomCurrent = room.current
   const roomPlaying = room.playing
@@ -46,37 +46,42 @@ function Shell() {
     setRoomCode(code)
   }, [])
 
- const joinRoom = useCallback((code) => {
-  setView('home')
-  setUrlRoom(code)
-}, [setUrlRoom])
+  const joinRoom = useCallback((code) => {
+    setView('home')
+    setUrlRoom(code)
+  }, [setUrlRoom])
 
-const leaveRoom = useCallback(() => {
-  if (!roomQueue.length) {
+  const leaveRoom = useCallback(() => {
+    if (!roomQueue.length) {
+      setUrlRoom('')
+      return
+    }
+    const queue = [...roomQueue]
+    for (const track of localPlaybackState.queue) {
+      if (!queue.some((item) => item.id === track.id)) queue.push(track)
+    }
+    const currentTrackId = roomQueue[roomCurrent]?.id
+    updateLocalPlayback({
+      queue,
+      current: Math.max(0, queue.findIndex((item) => item.id === currentTrackId)),
+      playing: roomPlaying,
+    })
     setUrlRoom('')
-    return
-  }
-  const queue = [...roomQueue]
-  for (const track of localPlaybackState.queue) {
-    if (!queue.some((item) => item.id === track.id)) queue.push(track)
-  }
-  const currentTrackId = roomQueue[roomCurrent]?.id
-  updateLocalPlayback({
-    queue,
-    current: Math.max(0, queue.findIndex((item) => item.id === currentTrackId)),
-    playing: roomPlaying,
-  })
-  setUrlRoom('')
-}, [updateLocalPlayback, localPlaybackState.queue, roomQueue, roomCurrent, roomPlaying, setUrlRoom])
+  }, [updateLocalPlayback, localPlaybackState.queue, roomQueue, roomCurrent, roomPlaying, setUrlRoom])
 
-const navigate = useCallback((id) => {
-  if (id !== view) setView(id)
-}, [view])
+  const navigate = useCallback((id) => {
+    if (id !== view) setView(id)
+  }, [view])
 
   const roomPlaybackActive = Boolean(roomCode && roomQueue.length)
   const playbackState = roomPlaybackActive ? room : localPlaybackState
-  const updateActivePlayback = useCallback((update) => {
-    if (roomPlaybackActive) updateRoom(update)
+
+  // The player only follows the room's clock while a room is driving playback.
+  const sync = useMemo(() => roomPlaybackActive ? { now: serverNow } : null, [roomPlaybackActive, serverNow])
+
+  // options.position = the real playhead (seconds) for pause / resume / seek; ignored for local playback.
+  const updateActivePlayback = useCallback((update, options) => {
+    if (roomPlaybackActive) updateRoom(update, options)
     else updateLocalPlayback(update)
   }, [roomPlaybackActive, updateRoom, updateLocalPlayback])
 
@@ -113,17 +118,17 @@ const navigate = useCallback((id) => {
   }, [roomCode, updateRoom, playLocalTrack, startVideo])
 
   const queueTracks = useCallback((tracks) => {
-  const list = (Array.isArray(tracks) ? tracks : []).filter((track) => track?.id)
-  if (!list.length) return
-  if (!roomCode) { list.forEach((track) => addLocalTrack(track)); return }
-  updateRoom((state) => {
-    const queue = [...state.queue]
-    for (const track of list) {
-      if (!queue.some((item) => item.id === track.id)) queue.push(track)
-    }
-    return { ...state, queue, current: state.queue.length ? state.current : 0 }
-  })
-}, [roomCode, updateRoom, addLocalTrack])
+    const list = (Array.isArray(tracks) ? tracks : []).filter((track) => track?.id)
+    if (!list.length) return
+    if (!roomCode) { list.forEach((track) => addLocalTrack(track)); return }
+    updateRoom((state) => {
+      const queue = [...state.queue]
+      for (const track of list) {
+        if (!queue.some((item) => item.id === track.id)) queue.push(track)
+      }
+      return { ...state, queue, current: state.queue.length ? state.current : 0 }
+    })
+  }, [roomCode, updateRoom, addLocalTrack])
 
   const queueTrack = useCallback((track, trigger) => {
     if (!track?.id) return
@@ -160,42 +165,39 @@ const navigate = useCallback((id) => {
     }
     switch (view) {
       case 'playlists': return <Playlists onBrowse={() => navigate('home')} onPlayTracks={playTracks} onQueueTrack={queueTrack} />
-        case 'quota':     return <Quota />
+      case 'quota':     return <Quota />
       case 'recent':    return <RecentRooms onJoin={joinRoom} />
       case 'settings':  return user ? <Settings /> : null
       default:          return <JoinRoom onJoin={joinRoom} />
     }
   }
 
-  const activeView = view
-  
   return (
-
-    
-   <div className={`app-shell${playbackState.queue.length ? ' has-player' : ''}`}>
-      <Sidenav view={activeView} onNavigate={navigate} open={navOpen} onClose={() => setNavOpen(false)} />
+    <div className={`app-shell${playbackState.queue.length ? ' has-player' : ''}`}>
+      <Sidenav view={view} onNavigate={navigate} open={navOpen} onClose={() => setNavOpen(false)} />
 
       <div className="app-content">
         <Topbar onMenuOpen={() => setNavOpen(true)} />
         <ErrorBoundary label="The player">
-   <PersistentPlayer
-  playback={playbackState}
-  onPlaybackChange={updateActivePlayback}
-  onNavigate={navigate}
-  onPlayTrack={playTrack}
-  onQueueTrack={queueTrack}
-/>
-</ErrorBoundary>
+          <PersistentPlayer
+            playback={playbackState}
+            onPlaybackChange={updateActivePlayback}
+            onNavigate={navigate}
+            onPlayTrack={playTrack}
+            onQueueTrack={queueTrack}
+            sync={sync}
+          />
+        </ErrorBoundary>
 
-       <QueueFly motion={queueFly} onComplete={completeQueueFly} />
-<div className="app-body">
-  <ErrorBoundary label="This page" resetKey={`${view}:${roomCode || 'local'}`}>
-    <div className="route-stage" key={`${view}:${roomCode || 'local'}`}>
-      {renderContent()}
-    </div>
-  </ErrorBoundary>
-</div>
-        <BottomNav view={activeView} onNavigate={navigate} />
+        <QueueFly motion={queueFly} onComplete={completeQueueFly} />
+        <div className="app-body">
+          <ErrorBoundary label="This page" resetKey={`${view}:${roomCode || 'local'}`}>
+            <div className="route-stage" key={`${view}:${roomCode || 'local'}`}>
+              {renderContent()}
+            </div>
+          </ErrorBoundary>
+        </div>
+        <BottomNav view={view} onNavigate={navigate} />
       </div>
 
       <AuthModal />

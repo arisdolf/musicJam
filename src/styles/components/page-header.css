@@ -1,0 +1,10 @@
+/* Icon + title header and wrapper used by the Quota and Recent Rooms pages. */
+.explore-page { width: min(100%, 640px); margin: 0 auto; padding: 28px 16px 64px; }
+.explore-header { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 24px; color: var(--accent-dark); }
+.explore-header > svg { margin-top: 4px; flex-shrink: 0; }
+.explore-header h1 { font-size: 28px; letter-spacing: -.6px; margin: 0 0 2px; color: var(--ink); }
+.explore-header p { margin: 0; }
+@media (max-width: 480px) {
+  .explore-page { padding: 20px 12px 48px; }
+  .explore-header h1 { font-size: 24px; }
+}

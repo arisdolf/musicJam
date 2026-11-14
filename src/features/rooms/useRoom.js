@@ -3,9 +3,12 @@ import { ref, onValue, set, remove, onDisconnect } from 'firebase/database'
 import { db } from '../../services/firebase'
 import { saveRecentRoom } from '../../pages/RecentRooms'
 
-const emptyRoom = { queue: [], current: 0, playing: false }
+// position = seconds into the current song at the moment `syncedAt` (server clock, ms).
+// Anyone can work out "where the song is now" as: position + (serverNow - syncedAt) while playing.
+const emptyRoom = { queue: [], current: 0, playing: false, position: 0, syncedAt: 0 }
 const MAX_QUEUE = 200
 const CLIENT_KEY = 'jamroom:client-id'
+
 function clean(room) {
   const raw = room?.queue ?? []
   const list = Array.isArray(raw) ? raw : Object.values(raw) // RTDB may hand back an object
@@ -14,6 +17,8 @@ function clean(room) {
     queue,
     current: Math.max(0, Math.min(Number(room?.current) || 0, queue.length - 1)),
     playing: Boolean(room?.playing),
+    position: Math.max(0, Number(room?.position) || 0),
+    syncedAt: Number(room?.syncedAt) || 0,
   }
 }
 
@@ -51,6 +56,13 @@ export function useRoom(roomCode) {
   const [members, setMembers]       = useState(1)
   const [clientId]                  = useState(makeClientId)
   const roomRef = useRef(room)
+  const offsetRef = useRef(0) // server clock minus this device's clock, in ms
+
+  // Every device stamps positions with the Firebase server clock, so phones with a wrong clock still agree.
+  const serverNow = useCallback(() => Date.now() + offsetRef.current, [])
+  useEffect(() => onValue(ref(db, '.info/serverTimeOffset'), (snap) => {
+    offsetRef.current = Number(snap.val()) || 0
+  }), [])
 
   useEffect(() => {
     if (!roomCode) return undefined
@@ -90,15 +102,36 @@ export function useRoom(roomCode) {
     }
   }, [roomCode, clientId])
 
-  const updateRoom = useCallback((update) => {
+  // update: new room state, or (state) => new state.
+  // options.position: where the song really is right now (pause, resume, seek). When omitted:
+  //   - a different song became current  -> 0
+  //   - same song                         -> the position is carried forward by the elapsed time.
+  const updateRoom = useCallback((update, options = {}) => {
     if (!roomCode) return
-    const next = clean(typeof update === 'function' ? update(roomRef.current) : update)
+    const prev = roomRef.current
+    const result = typeof update === 'function' ? update(prev) : update
+    const hasPosition = Number.isFinite(options.position)
+    if (result === prev && !hasPosition) return // nothing changed, nothing to broadcast
+
+    const draft = clean(result)
+    const now = serverNow()
+    const prevId = prev.queue[prev.current]?.id
+    const nextId = draft.queue[draft.current]?.id
+
+    let position
+    if (!nextId) position = 0
+    else if (hasPosition) position = options.position
+    else if (nextId !== prevId) position = 0
+    else if (prev.playing && prev.syncedAt) position = prev.position + Math.max(0, now - prev.syncedAt) / 1000
+    else position = prev.position
+
+    const next = { ...draft, position: Math.round(Math.max(0, position) * 100) / 100, syncedAt: now }
     roomRef.current = next
     setRoom(next)
     cacheRoom(roomCode, next)
-    set(ref(db, `rooms/${roomCode}`), { ...next, updatedAt: Date.now() })
+    set(ref(db, `rooms/${roomCode}`), { ...next, updatedAt: now })
       .catch((error) => { console.error('Room write failed:', error); setConnection('local') })
-  }, [roomCode])
+  }, [roomCode, serverNow])
 
-  return { room, updateRoom, connection, members }
+  return { room, updateRoom, connection, members, serverNow }
 }

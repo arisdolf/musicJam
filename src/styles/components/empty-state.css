@@ -1,0 +1,2 @@
+/* Dashed "nothing here" / error card (also used by ErrorBoundary). */
+.empty-result-card { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 26px 14px; border: 1px dashed var(--line); border-radius: 14px; color: var(--muted); font-size: 13px; animation: enter 320ms var(--ease-out) backwards; }

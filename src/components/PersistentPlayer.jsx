@@ -14,16 +14,24 @@ const YOUTUBE_READY_EVENT = 'onYouTubeIframeAPIReady'
 const OFFSET_KEY = 'jamroom:lyric-offset:'
 const LYRIC_TICK_MS = 100
 
+// Room sync: how far (seconds) this device may drift from the room clock before we seek.
+const DRIFT_PLAYING = 1.5
+const DRIFT_PAUSED = 0.4
+const DRIFT_CHECK_MS = 4000
+const SEEK_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'])
+
 function readOffset(trackId) {
   try { return Number(localStorage.getItem(OFFSET_KEY + trackId)) || 0 } catch { return 0 }
 }
 
-export default function PersistentPlayer({ playback, onPlaybackChange, onNavigate, onPlayTrack, onQueueTrack }) {
+// `sync` is { now() } while a room drives playback (null for local listening). It makes the player
+// follow the room's shared position, so someone joining mid-song lands at the same part.
+export default function PersistentPlayer({ playback, onPlaybackChange, onNavigate, onPlayTrack, onQueueTrack, sync }) {
   const { registerPlayer } = usePlayback()
   const { user, openAuth } = useAccount()
   const [playerReady, setPlayerReady] = useState(false)
   const [expanded, setExpanded] = useState(false)
-  const [view, setView] = useState('player')        // 'player' | 'queue'
+  const [view, setView] = useState('player')        // 'player' | 'queue' | 'search'
   const [lyricsFull, setLyricsFull] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [lyricsState, setLyricsState] = useState({ key: '', record: null, error: '' })
@@ -35,11 +43,12 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
   const hasPlayedRef = useRef(false)
   const lyricLineRefs = useRef([])
   const lyricsListRef = useRef(null)
-  const callbacksRef = useRef({ playback, onPlaybackChange })
+  const callbacksRef = useRef({ playback, onPlaybackChange, sync })
 
   const playbackQueue = playback.queue
   const playbackCurrent = playback.current
   const playbackPlaying = playback.playing
+  const syncStamp = playback.syncedAt
   const currentTrack = playbackQueue[playbackCurrent] || null
   const currentTrackId = currentTrack?.id
   const currentTrackLyricsId = currentTrack?.lyricsId
@@ -62,19 +71,50 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
 
   const collapse = useCallback(() => { setExpanded(false); setMenuOpen(false); setView('player') }, [])
 
+  // ── Room sync helpers ──────────────────────────────────────────────────────
+  // The real playhead, or undefined if the player has not started (so we never broadcast a fake 0:00).
+  const livePosition = useCallback(() => {
+    const player = playerRef.current
+    const state = player?.getPlayerState?.()
+    if (state !== 1 && state !== 2 && state !== 3) return undefined
+    const time = Number(player.getCurrentTime?.())
+    return Number.isFinite(time) ? time : undefined
+  }, [])
+
+  // Where the room says this song is right now. null = not in a room / not about this song.
+  const syncTarget = useCallback((trackId) => {
+    const { playback: latest, sync: link } = callbacksRef.current
+    if (!link || !latest.syncedAt) return null
+    if (latest.queue[latest.current]?.id !== trackId) return null
+    const elapsed = latest.playing ? Math.max(0, link.now() - latest.syncedAt) / 1000 : 0
+    return Math.max(0, (latest.position || 0) + elapsed)
+  }, [])
+
+  // Seek only when we have drifted noticeably, so normal playback is never interrupted.
+  const followRoom = useCallback((player, trackId) => {
+    const target = syncTarget(trackId)
+    if (target === null) return
+    const limit = callbacksRef.current.playback.playing ? DRIFT_PLAYING : DRIFT_PAUSED
+    const time = Number(player.getCurrentTime?.() || 0)
+    if (Math.abs(time - target) > limit) {
+      try { player.seekTo(target, true) } catch { /* player not ready */ }
+    }
+  }, [syncTarget])
+
   const requestVideo = useCallback((track, shouldPlay = true) => {
     const player = playerRef.current
     if (!track?.id || !player) return
     if (player.getVideoData?.()?.video_id === track.id) {
-      if (shouldPlay) player.playVideo()
+      if (shouldPlay) { followRoom(player, track.id); player.playVideo() }
       else player.pauseVideo()
       return
     }
     requestedVideoRef.current = track.id
     hasPlayedRef.current = false
-    if (shouldPlay) player.loadVideoById(track.id)
-    else player.cueVideoById(track.id)
-  }, [])
+    const startSeconds = syncTarget(track.id) ?? 0
+    if (shouldPlay) player.loadVideoById({ videoId: track.id, startSeconds })
+    else player.cueVideoById({ videoId: track.id, startSeconds })
+  }, [followRoom, syncTarget])
 
   const playIndex = useCallback((index) => {
     const track = playbackQueue[index]
@@ -86,10 +126,15 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
   const changePlaying = useCallback((playing) => {
     const track = playbackQueue[playbackCurrent]
     if (!track) return
-    onPlaybackChange((state) => ({ ...state, playing }))
+    onPlaybackChange((state) => ({ ...state, playing }), { position: livePosition() })
     if (playing) requestVideo(track)
     else playerRef.current?.pauseVideo?.()
-  }, [onPlaybackChange, playbackCurrent, playbackQueue, requestVideo])
+  }, [onPlaybackChange, playbackCurrent, playbackQueue, requestVideo, livePosition])
+
+  // Tell the room where the playhead was moved to.
+  const seekRoom = useCallback((seconds) => {
+    onPlaybackChange((state) => state, { position: seconds })
+  }, [onPlaybackChange])
 
   // If the browser blocked autoplay, the first click should actually start the video.
   const togglePlay = () => {
@@ -119,7 +164,7 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
 
   const go = (id) => { onNavigate?.(id); collapse() }
 
-  useEffect(() => { callbacksRef.current = { playback, onPlaybackChange } }, [playback, onPlaybackChange])
+  useEffect(() => { callbacksRef.current = { playback, onPlaybackChange, sync } }, [playback, onPlaybackChange, sync])
 
   useEffect(() => {
     if (!fullOpen) return undefined
@@ -168,22 +213,33 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
             if (event.data === 1) hasPlayedRef.current = true
             const latest = callbacksRef.current
             if (event.data === 1 && !latest.playback.playing) {
-              latest.onPlaybackChange((state) => ({ ...state, playing: true }))
+              latest.onPlaybackChange((state) => ({ ...state, playing: true }), { position: livePosition() })
             }
             if (event.data === 2 && latest.playback.playing && hasPlayedRef.current) {
-              latest.onPlaybackChange((state) => ({ ...state, playing: false }))
+              latest.onPlaybackChange((state) => ({ ...state, playing: false }), { position: livePosition() })
             }
             if (event.data === 0) {
-              latest.onPlaybackChange((state) => state.queue.length > 1
-                ? { ...state, current: (state.current + 1) % state.queue.length, playing: true }
-                : { ...state, playing: false })
+              // Every device sees the song end. Only advance if the room is still on the song that ended,
+              // otherwise a joiner would skip an extra track.
+              const endedId = event.target?.getVideoData?.()?.video_id
+              const single = latest.playback.queue.length <= 1
+              latest.onPlaybackChange((state) => {
+                if (endedId && state.queue[state.current]?.id !== endedId) return state
+                return state.queue.length > 1
+                  ? { ...state, current: (state.current + 1) % state.queue.length, playing: true }
+                  : { ...state, playing: false }
+              }, single ? { position: 0 } : undefined)
             }
           },
-          onError: () => {
+          onError: (event) => {
             requestedVideoRef.current = null
-            callbacksRef.current.onPlaybackChange((state) => state.current < state.queue.length - 1
-              ? { ...state, current: state.current + 1, playing: true }
-              : { ...state, playing: false })
+            const failedId = event.target?.getVideoData?.()?.video_id
+            callbacksRef.current.onPlaybackChange((state) => {
+              if (failedId && state.queue[state.current]?.id !== failedId) return state
+              return state.current < state.queue.length - 1
+                ? { ...state, current: state.current + 1, playing: true }
+                : { ...state, playing: false }
+            })
           },
         },
       })
@@ -208,8 +264,9 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
       host?.replaceChildren()
       setPlayerReady(false)
     }
-  }, [registerPlayer])
+  }, [registerPlayer, livePosition])
 
+  // Load / play / pause whatever the (local or room) state says. New songs start at the room's position.
   useEffect(() => {
     const player = playerRef.current
     if (!playerReady || !player || !currentTrackId) return undefined
@@ -219,8 +276,9 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
         if (requestedVideoRef.current !== currentTrackId) {
           requestedVideoRef.current = currentTrackId
           hasPlayedRef.current = false
-          if (playbackPlaying) player.loadVideoById(currentTrackId)
-          else player.cueVideoById(currentTrackId)
+          const startSeconds = syncTarget(currentTrackId) ?? 0
+          if (playbackPlaying) player.loadVideoById({ videoId: currentTrackId, startSeconds })
+          else player.cueVideoById({ videoId: currentTrackId, startSeconds })
         }
       } else if (playbackPlaying) player.playVideo()
       else player.pauseVideo()
@@ -236,7 +294,29 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
       }
     }, 1200)
     return () => clearTimeout(timer)
-  }, [currentTrackId, playbackPlaying, playerReady])
+  }, [currentTrackId, playbackPlaying, playerReady, syncTarget])
+
+  // Room sync 1/2: whenever anyone plays, pauses, seeks or changes song, jump to the shared position.
+  useEffect(() => {
+    if (!sync || !playerReady || !currentTrackId || !syncStamp) return
+    const player = playerRef.current
+    if (!player || player.getVideoData?.()?.video_id !== currentTrackId) return // the load effect handles new songs
+    const state = player.getPlayerState?.()
+    if (state !== 1 && state !== 2 && state !== 3) return // not started yet (autoplay blocked): starts at the right spot on first tap
+    followRoom(player, currentTrackId)
+  }, [sync, playerReady, currentTrackId, syncStamp, playbackPlaying, followRoom])
+
+  // Room sync 2/2: while playing, quietly correct drift (buffering, background tabs) every few seconds.
+  useEffect(() => {
+    if (!sync || !playerReady || !currentTrackId || !playbackPlaying) return undefined
+    const timer = setInterval(() => {
+      const player = playerRef.current
+      if (!player || player.getPlayerState?.() !== 1) return
+      if (player.getVideoData?.()?.video_id !== currentTrackId) return
+      followRoom(player, currentTrackId)
+    }, DRIFT_CHECK_MS)
+    return () => clearInterval(timer)
+  }, [sync, playerReady, currentTrackId, playbackPlaying, followRoom])
 
   // ── Lyrics fetch ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -343,82 +423,82 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
         <div className="np-backdrop" style={{ backgroundImage: `url("${art}")` }} aria-hidden="true" />
 
         <header className="np-top">
-  <button className="np-icon" onClick={view === 'player' ? collapse : () => setView('player')} aria-label={view === 'player' ? 'Close player' : 'Back to player'}>
-    {view === 'player' ? <ChevronDown size={22} /> : <ArrowLeft size={20} />}
-  </button>
-  <span className="np-kicker">{view === 'queue' ? 'UP NEXT' : view === 'search' ? 'ADD MUSIC' : 'NOW PLAYING'}</span>
-  <span className="np-top-spacer" />
-</header>
+          <button className="np-icon" onClick={view === 'player' ? collapse : () => setView('player')} aria-label={view === 'player' ? 'Close player' : 'Back to player'}>
+            {view === 'player' ? <ChevronDown size={22} /> : <ArrowLeft size={20} />}
+          </button>
+          <span className="np-kicker">{view === 'queue' ? 'UP NEXT' : view === 'search' ? 'ADD MUSIC' : 'NOW PLAYING'}</span>
+          <span className="np-top-spacer" />
+        </header>
 
         {view === 'search'
-  ? <SongSearch
-      queuedIds={playbackQueue.map((track) => track.id)}
-      onPlay={onPlayTrack}
-      onQueue={onQueueTrack}
-    />
-  : view === 'queue'
-          ? <ul className="np-queue-list" onWheel={(event) => rubberBandAtBounds(event.currentTarget, event.deltaY)}>
-              {playbackQueue.map((track, index) => <li className={index === playbackCurrent ? 'current' : ''} key={`${track.id}-${index}`}>
-                <button className="np-queue-track" onClick={() => playIndex(index)}>
-                  <img src={track.thumbnail || `https://i.ytimg.com/vi/${track.id}/mqdefault.jpg`} alt="" />
-                  <span><strong>{track.title}</strong><small>{track.artist}</small></span>
-                </button>
-                <button className="np-icon small" onClick={() => removeTrack(index)} aria-label={`Remove ${track.title}`}><Trash2 size={15} /></button>
-              </li>)}
-            </ul>
-          : <div className="np-body">
-              <div className={`np-stage${lyricsFull ? ' is-lyrics' : ''}`}>
-                {lyricsFull
-                  ? <>
-                      <div className="np-lyrics-bar">
-                        <span>Synced lyrics</span>
-                        {lyricLines.length > 0 && <div className="lyric-offset" role="group" aria-label="Adjust lyric timing">
-                          <button onClick={() => nudgeOffset(-0.5)} aria-label="Show lyrics earlier" title="Lyrics late? Show them earlier"><Minus size={13} /></button>
-                          <span title="Lyric timing offset">{offsetLabel}</span>
-                          <button onClick={() => nudgeOffset(0.5)} aria-label="Show lyrics later" title="Lyrics early? Show them later"><Plus size={13} /></button>
+          ? <SongSearch
+              queuedIds={playbackQueue.map((track) => track.id)}
+              onPlay={onPlayTrack}
+              onQueue={onQueueTrack}
+            />
+          : view === 'queue'
+            ? <ul className="np-queue-list" onWheel={(event) => rubberBandAtBounds(event.currentTarget, event.deltaY)}>
+                {playbackQueue.map((track, index) => <li className={index === playbackCurrent ? 'current' : ''} key={`${track.id}-${index}`}>
+                  <button className="np-queue-track" onClick={() => playIndex(index)}>
+                    <img src={track.thumbnail || `https://i.ytimg.com/vi/${track.id}/mqdefault.jpg`} alt="" />
+                    <span><strong>{track.title}</strong><small>{track.artist}</small></span>
+                  </button>
+                  <button className="np-icon small" onClick={() => removeTrack(index)} aria-label={`Remove ${track.title}`}><Trash2 size={15} /></button>
+                </li>)}
+              </ul>
+            : <div className="np-body">
+                <div className={`np-stage${lyricsFull ? ' is-lyrics' : ''}`}>
+                  {lyricsFull
+                    ? <>
+                        <div className="np-lyrics-bar">
+                          <span>Synced lyrics</span>
+                          {lyricLines.length > 0 && <div className="lyric-offset" role="group" aria-label="Adjust lyric timing">
+                            <button onClick={() => nudgeOffset(-0.5)} aria-label="Show lyrics earlier" title="Lyrics late? Show them earlier"><Minus size={13} /></button>
+                            <span title="Lyric timing offset">{offsetLabel}</span>
+                            <button onClick={() => nudgeOffset(0.5)} aria-label="Show lyrics later" title="Lyrics early? Show them later"><Plus size={13} /></button>
+                          </div>}
+                        </div>
+                        {lyricsLoading && <p className="np-lyrics-note"><Loader size={15} className="spin" /> Loading lyrics…</p>}
+                        {!lyricsLoading && lyricsError && <p className="np-lyrics-note">{lyricsError}</p>}
+                        {!lyricsLoading && !lyricsError && <div className="np-lyrics-list" ref={lyricsListRef} onWheel={(event) => rubberBandAtBounds(event.currentTarget, event.deltaY)}>
+                          {lyricLines.map((line, index) => <p
+                            key={`${line.time}-${index}`}
+                            ref={(element) => { lyricLineRefs.current[index] = element }}
+                            className={index === activeLyricIndex ? 'current' : ''}
+                          >{line.text || '♪'}</p>)}
                         </div>}
-                      </div>
-                      {lyricsLoading && <p className="np-lyrics-note"><Loader size={15} className="spin" /> Loading lyrics…</p>}
-                      {!lyricsLoading && lyricsError && <p className="np-lyrics-note">{lyricsError}</p>}
-                      {!lyricsLoading && !lyricsError && <div className="np-lyrics-list" ref={lyricsListRef} onWheel={(event) => rubberBandAtBounds(event.currentTarget, event.deltaY)}>
-                        {lyricLines.map((line, index) => <p
-                          key={`${line.time}-${index}`}
-                          ref={(element) => { lyricLineRefs.current[index] = element }}
-                          className={index === activeLyricIndex ? 'current' : ''}
-                        >{line.text || '♪'}</p>)}
-                      </div>}
-                    </>
-                  : <img key={currentTrackId} className="np-art" src={art} alt="" />}
-              </div>
-
-              <div className="np-title-row">
-                <div className="np-title">
-                  <strong title={currentTrack.title}>{currentTrack.title}</strong>
-                  <small>{currentTrack.artist}</small>
+                      </>
+                    : <img key={currentTrackId} className="np-art" src={art} alt="" />}
                 </div>
-                <AddToPlaylist track={currentTrack} />
-              </div>
 
-              {!lyricsFull && <div className="np-lyric-window" aria-live="off">
-                {lyricsLoading
-                  ? <p className="current"><Loader size={15} className="spin" /> Loading lyrics…</p>
-                  : lyricsError
-                    ? <p>{lyricsError}</p>
-                    : windowLines.map((text, slot) => <p key={`${activeLyricIndex}:${slot}`} className={slot === 1 ? 'current' : ''}>{text}</p>)}
+                <div className="np-title-row">
+                  <div className="np-title">
+                    <strong title={currentTrack.title}>{currentTrack.title}</strong>
+                    <small>{currentTrack.artist}</small>
+                  </div>
+                  <AddToPlaylist track={currentTrack} />
+                </div>
+
+                {!lyricsFull && <div className="np-lyric-window" aria-live="off">
+                  {lyricsLoading
+                    ? <p className="current"><Loader size={15} className="spin" /> Loading lyrics…</p>
+                    : lyricsError
+                      ? <p>{lyricsError}</p>
+                      : windowLines.map((text, slot) => <p key={`${activeLyricIndex}:${slot}`} className={slot === 1 ? 'current' : ''}>{text}</p>)}
+                </div>}
+
+                <ProgressBar key={currentTrackId} playerRef={playerRef} fallbackDuration={currentTrackDuration} onSeek={seekRoom} />
               </div>}
 
-              <ProgressBar key={currentTrackId} playerRef={playerRef} fallbackDuration={currentTrackDuration} />
-            </div>}
-
         <footer className="np-controls">
-  <button className={`np-circle${lyricsFull && view === 'player' ? ' active' : ''}`} onClick={() => { setView('player'); setLyricsFull((open) => !open) }} aria-label="Toggle full lyrics" aria-pressed={lyricsFull}><Mic2 size={17} /></button>
-  <button className="np-icon" onClick={() => playIndex(playbackCurrent - 1)} disabled={!canPrev} aria-label="Previous song"><SkipBack size={22} fill="currentColor" /></button>
-  <button className="np-play" onClick={togglePlay} aria-label={playbackPlaying ? 'Pause' : 'Play'}>
-    <span key={playbackPlaying ? 'pause' : 'play'} className="motion-icon">{playbackPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}</span>
-  </button>
-  <button className="np-icon" onClick={() => playIndex(playbackCurrent + 1)} disabled={!canNext} aria-label="Next song"><SkipForward size={22} fill="currentColor" /></button>
-  <button className={`np-circle${menuOpen ? ' active' : ''}`} onClick={() => setMenuOpen((open) => !open)} aria-label="More options" aria-haspopup="menu" aria-expanded={menuOpen}><Menu size={17} /></button>
-</footer>
+          <button className={`np-circle${lyricsFull && view === 'player' ? ' active' : ''}`} onClick={() => { setView('player'); setLyricsFull((open) => !open) }} aria-label="Toggle full lyrics" aria-pressed={lyricsFull}><Mic2 size={17} /></button>
+          <button className="np-icon" onClick={() => playIndex(playbackCurrent - 1)} disabled={!canPrev} aria-label="Previous song"><SkipBack size={22} fill="currentColor" /></button>
+          <button className="np-play" onClick={togglePlay} aria-label={playbackPlaying ? 'Pause' : 'Play'}>
+            <span key={playbackPlaying ? 'pause' : 'play'} className="motion-icon">{playbackPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}</span>
+          </button>
+          <button className="np-icon" onClick={() => playIndex(playbackCurrent + 1)} disabled={!canNext} aria-label="Next song"><SkipForward size={22} fill="currentColor" /></button>
+          <button className={`np-circle${menuOpen ? ' active' : ''}`} onClick={() => setMenuOpen((open) => !open)} aria-label="More options" aria-haspopup="menu" aria-expanded={menuOpen}><Menu size={17} /></button>
+        </footer>
 
         {menuOpen && <>
           <div className="np-menu-scrim" onClick={() => setMenuOpen(false)} />
@@ -439,7 +519,8 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
 }
 
 // Polls the player clock itself so only this small bar re-renders, not the whole player.
-function ProgressBar({ playerRef, fallbackDuration }) {
+// onSeek(seconds) lets the room know when the listener moves the playhead.
+function ProgressBar({ playerRef, fallbackDuration, onSeek }) {
   const [clock, setClock] = useState({ time: 0, duration: fallbackDuration || 0 })
   const [drag, setDrag] = useState(null)
 
@@ -457,8 +538,11 @@ function ProgressBar({ playerRef, fallbackDuration }) {
   }, [playerRef, fallbackDuration])
 
   const commit = (value) => {
-    try { if (Number.isFinite(value)) playerRef.current?.seekTo?.(value, true) } catch { /* player not ready */ }
-    setClock((previous) => ({ ...previous, time: value }))
+    if (Number.isFinite(value)) {
+      try { playerRef.current?.seekTo?.(value, true) } catch { /* player not ready */ }
+      onSeek?.(value)
+      setClock((previous) => ({ ...previous, time: value }))
+    }
     setDrag(null)
   }
 
@@ -479,7 +563,7 @@ function ProgressBar({ playerRef, fallbackDuration }) {
       onChange={(event) => setDrag(Number(event.target.value))}
       onPointerUp={(event) => commit(Number(event.currentTarget.value))}
       onPointerCancel={() => setDrag(null)}
-      onKeyUp={(event) => commit(Number(event.currentTarget.value))}
+      onKeyUp={(event) => { if (SEEK_KEYS.has(event.key)) commit(Number(event.currentTarget.value)) }}
     />
     <div className="np-times"><span>{formatTime(shown)}</span><span>{formatTime(clock.duration)}</span></div>
   </div>

@@ -1,0 +1,22 @@
+/* Auth / save modal (bottom sheet on phones) and feedback / confirm cards. */
+.overlay { position: fixed; inset: 0; z-index: 200; display: grid; place-items: end center; background: var(--scrim); animation: fade-in 220ms var(--ease-out) backwards; }
+.modal { position: relative; width: 100%; max-width: 480px; padding: 28px 20px max(32px, env(safe-area-inset-bottom, 32px)); border-radius: 20px 20px 0 0; background: var(--bg); box-shadow: 0 -8px 40px rgba(0,0,0,.15); animation: sheet-in 380ms var(--ease-out) backwards; }
+.modal h2 { font-size: 21px; letter-spacing: -.4px; margin: 0 0 4px; }
+.modal > .muted { margin: 0 0 20px; font-size: 14px; }
+.modal-switch { text-align: center; font-size: 13px; margin: 14px 0 0; }
+.modal-close { position: absolute; top: 10px; right: 12px; width: 36px; height: 36px; border: 0; border-radius: 50%; background: none; color: var(--muted); display: grid; place-items: center; }
+.modal-close:hover:not(:disabled) { background: var(--surface); }
+.auth-icon { display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: 14px; border-radius: 12px; color: var(--accent-dark); background: var(--accent-soft); }
+@media (min-width: 520px) {
+  .overlay { place-items: center; padding: 20px; }
+  .modal { border-radius: 16px; padding: 28px 24px 24px; animation: pop-in 380ms var(--spring) backwards; }
+}
+
+.feedback-overlay { position: fixed; inset: 0; z-index: 240; display: grid; place-items: center; padding: 18px; background: rgba(4,8,10,.62); backdrop-filter: blur(8px); animation: fade-in 220ms var(--ease-out) backwards; }
+.feedback-card { position: relative; width: min(100%, 420px); padding: 30px 26px 24px; border: 1px solid var(--line); border-radius: 22px; background: var(--bg); box-shadow: 0 26px 90px rgba(0,0,0,.35); animation: pop-in 380ms var(--spring) backwards; }
+.feedback-icon { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 14px; border-radius: 14px; background: var(--accent-soft); color: var(--accent-dark); }
+.danger-icon { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
+.feedback-card h2 { margin: 0 0 8px; font-size: 20px; }
+.feedback-card p { margin: 0 0 20px; color: var(--muted); font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; }
+.feedback-card > .btn { min-width: 110px; }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
