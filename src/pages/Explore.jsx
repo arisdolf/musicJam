@@ -83,7 +83,7 @@ export default function Explore({ onPlayTrack, onQueueTrack }) {
           <div><span className="eyebrow">{active ? 'TOP 25 · MOST VIEWED' : 'YOUTUBE MUSIC CHART'}</span><h2 id="popular-title">{active ? `Popular ${active.label} songs` : 'Popular in the Philippines'}</h2></div>
           <span className="popular-heading-icon">{active ? <active.icon size={18} /> : <Flame size={18} />}</span>
         </div>
-        <p className="muted popular-subtitle">{active ? 'Ranked by views. Videos with synced lyrics are shown.' : 'Songs people are watching right now.'}</p>
+        <p className="muted popular-subtitle">{active ? 'Ranked by views. Audio uploads shown first.' : 'Songs people are watching right now.'}</p>
         {visibleLoading && <div className="explore-loading"><Loader size={18} className="spin" /> Finding playable songs…</div>}
         {!visibleLoading && visibleTracks.length > 0 && <ul className="track-list popular-track-list">
           {visibleTracks.map((track, index) => (
@@ -98,7 +98,7 @@ export default function Explore({ onPlayTrack, onQueueTrack }) {
             </li>
           ))}
         </ul>}
-        {!visibleLoading && !visibleTracks.length && <div className="empty-result-card"><Music2 size={22} /><span>{active ? 'No songs with synced lyrics found. Try another genre.' : 'No playable songs found. Try again later.'}</span></div>}
+        {!visibleLoading && !visibleTracks.length && <div className="empty-result-card"><Music2 size={22} /><span>{active ? 'No songs found. Try another genre.' : 'No playable songs found. Try again later.'}</span></div>}
       </section>
       <FeedbackModal title="Could not load music" message={feedback} onClose={() => setFeedback('')} />
     </main>

@@ -502,3 +502,10 @@ input[readonly] { background: var(--surface); color: var(--muted); }
 .playlist-import-btn { width: 100%; margin: 0 0 18px; border-style: dashed; color: var(--accent-dark); }
 .import-progress { height: 6px; margin: 0 0 20px; overflow: hidden; border-radius: 999px; background: var(--surface); }
 .import-progress span { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width 200ms var(--ease-out); }
+
+.room-playlists { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.room-playlist { border-bottom: 1px solid var(--line); }
+.room-playlist:last-child { border-bottom: 0; }
+.room-playlist > .track { border-bottom: 0; }
+.room-playlist-tracks { margin: 0 0 8px 14px; border-left: 2px solid var(--line); }
+.room-playlist-tracks .track:last-child { border-bottom: 0; }

@@ -1,15 +1,15 @@
-// src/features/rooms/useRoom.js
-// Shared rooms through your own API (Postgres). Polls every 2 seconds.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api } from '../../services/api'
+import { ref, onValue, set, remove, onDisconnect } from 'firebase/database'
+import { db } from '../../services/firebase'
 import { saveRecentRoom } from '../../pages/RecentRooms'
 
 const emptyRoom = { queue: [], current: 0, playing: false }
 const MAX_QUEUE = 200
-const POLL_MS = 2000
-
+const CLIENT_KEY = 'jamroom:client-id'
 function clean(room) {
-  const queue = JSON.parse(JSON.stringify((room?.queue ?? []).slice(0, MAX_QUEUE)))
+  const raw = room?.queue ?? []
+  const list = Array.isArray(raw) ? raw : Object.values(raw) // RTDB may hand back an object
+  const queue = JSON.parse(JSON.stringify(list.filter(Boolean).slice(0, MAX_QUEUE))) // strips undefined
   return {
     queue,
     current: Math.max(0, Math.min(Number(room?.current) || 0, queue.length - 1)),
@@ -29,8 +29,17 @@ function cacheRoom(roomCode, room) {
   try { localStorage.setItem(`jamroom:${roomCode}`, JSON.stringify(room)) } catch { /* noop */ }
 }
 
-// A fresh id per tab load, so duplicated tabs still count as two people.
-const makeClientId = () => crypto.randomUUID?.() || Math.random().toString(36).slice(2)
+const makeClientId = () => {
+  try {
+    const saved = sessionStorage.getItem(CLIENT_KEY)
+    if (saved) return saved
+    const id = crypto.randomUUID?.() || Math.random().toString(36).slice(2)
+    sessionStorage.setItem(CLIENT_KEY, id)
+    return id
+  } catch {
+    return crypto.randomUUID?.() || Math.random().toString(36).slice(2)
+  }
+}
 
 export function createRoomCode() {
   return Math.random().toString(36).slice(2, 8).toUpperCase()
@@ -41,40 +50,44 @@ export function useRoom(roomCode) {
   const [connection, setConnection] = useState('connecting')
   const [members, setMembers]       = useState(1)
   const [clientId]                  = useState(makeClientId)
-  const roomRef    = useRef(room)
-  const versionRef = useRef(-1)
-  const writesRef  = useRef(0)
+  const roomRef = useRef(room)
 
   useEffect(() => {
     if (!roomCode) return undefined
-    let cancelled = false
     const initial = savedRoom(roomCode)
     roomRef.current = initial
-    versionRef.current = -1
     setRoom(initial)
     setConnection('connecting')
     saveRecentRoom(roomCode)
 
-    const poll = async () => {
-      try {
-        const data = await api(`/api/rooms/${roomCode}?client=${encodeURIComponent(clientId)}`)
-        if (cancelled) return
+    const me = ref(db, `roomMembers/${roomCode}/${clientId}`)
+
+    const offConn = onValue(ref(db, '.info/connected'), (snap) => {
+      if (snap.val() === true) {
         setConnection('connected')
-        setMembers(data.members)
-        if (writesRef.current > 0 || data.room.version === versionRef.current) return
-        versionRef.current = data.room.version
-        const next = clean(data.room)
-        if (data.room.version === 0 || JSON.stringify(next) === JSON.stringify(roomRef.current)) return
-        roomRef.current = next
-        setRoom(next)
-        cacheRoom(roomCode, next)
-      } catch (error) {
-        if (!cancelled) { console.error('Room poll failed:', error); setConnection('local') }
-      }
+        onDisconnect(me).remove()
+        set(me, true)
+      } else setConnection('local')
+    })
+
+    // Fires on every remote change AND on our own writes (instantly, before the server confirms).
+    const offRoom = onValue(ref(db, `rooms/${roomCode}`), (snap) => {
+      if (!snap.exists()) return
+      const next = clean(snap.val())
+      if (JSON.stringify(next) === JSON.stringify(roomRef.current)) return
+      roomRef.current = next
+      setRoom(next)
+      cacheRoom(roomCode, next)
+    }, (error) => { console.error('Room listen failed:', error); setConnection('local') })
+
+    const offMembers = onValue(ref(db, `roomMembers/${roomCode}`), (snap) => {
+      setMembers(Math.max(1, snap.size))
+    })
+
+    return () => {
+      offConn(); offRoom(); offMembers()
+      remove(me).catch(() => {})
     }
-    poll()
-    const timer = setInterval(poll, POLL_MS)
-    return () => { cancelled = true; clearInterval(timer) }
   }, [roomCode, clientId])
 
   const updateRoom = useCallback((update) => {
@@ -83,12 +96,8 @@ export function useRoom(roomCode) {
     roomRef.current = next
     setRoom(next)
     cacheRoom(roomCode, next)
-
-    writesRef.current++
-    api(`/api/rooms/${roomCode}`, { method: 'PUT', body: next })
-      .then(({ version }) => { versionRef.current = version })
+    set(ref(db, `rooms/${roomCode}`), { ...next, updatedAt: Date.now() })
       .catch((error) => { console.error('Room write failed:', error); setConnection('local') })
-      .finally(() => { writesRef.current-- })
   }, [roomCode])
 
   return { room, updateRoom, connection, members }

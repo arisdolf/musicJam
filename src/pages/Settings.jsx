@@ -1,18 +1,13 @@
 // src/pages/Settings.jsx
 import { useState } from 'react'
-import { api } from '../services/api'
+
 import { useAccount } from '../features/account/AccountContext'
 import { User, Lock, LogOut, Trash2, Check, Monitor } from 'lucide-react'
 
 // ADJUST these to match the routes in your server's auth file.
-const ROUTES = {
-  profile:  '/api/auth/me',        // PATCH  { name }                          -> { user }
-  password: '/api/auth/password',  // PATCH  { currentPassword, newPassword }
-  remove:   '/api/auth/me',        // DELETE (should also delete the user's playlists)
-}
 
 export default function Settings() {
-  const { user, logOut, updateUser } = useAccount()
+  const { user, logOut, updateName, changePassword, deleteAccount } = useAccount()
 
   const [name, setName]           = useState(user?.name || '')
   const [nameSaved, setNameSaved] = useState(false)
@@ -27,42 +22,38 @@ export default function Settings() {
   const [delErr, setDelErr]               = useState('')
   const [busy, setBusy]                   = useState(false)
 
-  const saveName = async (e) => {
-    e.preventDefault()
-    const cleanName = name.trim()
-    if (!cleanName) return
-    setBusy(true); setNameErr('')
-    try {
-      const data = await api(ROUTES.profile, { method: 'PATCH', body: { name: cleanName } })
-      updateUser(data.user || { name: cleanName })
-      setNameSaved(true); setTimeout(() => setNameSaved(false), 2000)
-    } catch (err) { setNameErr(err.message) }
-    finally { setBusy(false) }
-  }
+ const saveName = async (e) => {
+  e.preventDefault()
+  const cleanName = name.trim()
+  if (!cleanName) return
+  setBusy(true); setNameErr('')
+  try {
+    await updateName(cleanName)
+    setNameSaved(true); setTimeout(() => setNameSaved(false), 2000)
+  } catch (err) { setNameErr(err.message) }
+  finally { setBusy(false) }
+}
 
   const savePassword = async (e) => {
-    e.preventDefault()
-    if (newPw.length < 6) { setPwErr('Password must be at least 6 characters.'); return }
-    setBusy(true); setPwErr('')
-    try {
-      await api(ROUTES.password, { method: 'PATCH', body: { currentPassword: currPw, newPassword: newPw } })
-      setCurrPw(''); setNewPw('')
-      setPwSaved(true); setTimeout(() => setPwSaved(false), 2000)
-    } catch (err) { setPwErr(err.message) }
-    finally { setBusy(false) }
-  }
+  e.preventDefault()
+  if (newPw.length < 6) { setPwErr('Password must be at least 6 characters.'); return }
+  setBusy(true); setPwErr('')
+  try {
+    await changePassword(currPw, newPw)
+    setCurrPw(''); setNewPw('')
+    setPwSaved(true); setTimeout(() => setPwSaved(false), 2000)
+  } catch (err) {
+    setPwErr(err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password'
+      ? 'Current password is incorrect.' : err.message)
+  } finally { setBusy(false) }
+}
 
   const handleDelete = async () => {
-    if (deleteConfirm !== 'DELETE') { setDelErr('Type DELETE to confirm.'); return }
-    setBusy(true); setDelErr('')
-    try {
-      await api(ROUTES.remove, { method: 'DELETE' })
-      await logOut()
-    } catch (err) {
-      setDelErr(err.message)
-      setBusy(false)
-    }
-  }
+  if (deleteConfirm !== 'DELETE') { setDelErr('Type DELETE to confirm.'); return }
+  setBusy(true); setDelErr('')
+  try { await deleteAccount(currPw) }   // see note below
+  catch (err) { setDelErr(err.message); setBusy(false) }
+}
 
   return (
     <main className="settings-page">

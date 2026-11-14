@@ -112,6 +112,19 @@ const navigate = useCallback((id) => {
     startVideo(track.id)
   }, [roomCode, updateRoom, playLocalTrack, startVideo])
 
+  const queueTracks = useCallback((tracks) => {
+  const list = (Array.isArray(tracks) ? tracks : []).filter((track) => track?.id)
+  if (!list.length) return
+  if (!roomCode) { list.forEach((track) => addLocalTrack(track)); return }
+  updateRoom((state) => {
+    const queue = [...state.queue]
+    for (const track of list) {
+      if (!queue.some((item) => item.id === track.id)) queue.push(track)
+    }
+    return { ...state, queue, current: state.queue.length ? state.current : 0 }
+  })
+}, [roomCode, updateRoom, addLocalTrack])
+
   const queueTrack = useCallback((track, trigger) => {
     if (!track?.id) return
     animateQueueAdd(track, trigger)
@@ -143,7 +156,7 @@ const navigate = useCallback((id) => {
 
   const renderContent = () => {
     if (roomCode && view === 'home') {
-      return <MusicRoom roomCode={roomCode} room={room} updateRoom={updateRoom} connection={connection} members={members} onLeave={leaveRoom} onPlayTrack={playTrack} onQueueTrack={queueTrack} />
+      return <MusicRoom roomCode={roomCode} room={room} updateRoom={updateRoom} connection={connection} members={members} onLeave={leaveRoom} onPlayTrack={playTrack} onQueueTrack={queueTrack} onPlayTracks={playTracks} onQueueTracks={queueTracks} />
     }
     switch (view) {
       case 'playlists': return <Playlists onBrowse={() => navigate('explore')} onPlayTracks={playTracks} onQueueTrack={queueTrack} />

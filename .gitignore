@@ -27,3 +27,7 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# Google Cloud credentials
+service-account.json
+*service-account*.json

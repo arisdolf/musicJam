@@ -3,9 +3,9 @@ import { searchYouTube } from '../services/youtube'
 import AddToPlaylist from './AddToPlaylist'
 import FeedbackModal from './FeedbackModal'
 import { useAccount } from '../features/account/AccountContext'
-import { Play, Search, Music2, Check, X, Plus, GripVertical, ArrowUp, ArrowDown } from 'lucide-react'
+import { Play, Search, Music2, Check, X, Plus, GripVertical, ArrowUp, ArrowDown, ListMusic, ListPlus, ChevronDown } from 'lucide-react'
 
-export default function MusicRoom({ roomCode, room, updateRoom, connection, members, onLeave, onPlayTrack, onQueueTrack }) {
+export default function MusicRoom({ roomCode, room, updateRoom, connection, members, onLeave, onPlayTrack, onQueueTrack, onPlayTracks, onQueueTracks }) {
   const { user, openAuth, createPlaylist } = useAccount()
   const [query, setQuery] = useState('')
   const [searchState, setSearchState] = useState({ query: '', results: [], searching: false, error: '' })
@@ -34,7 +34,7 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
             query: normalizedQuery,
             results: tracks,
             searching: false,
-            error: tracks.length ? '' : 'No songs with synced lyrics found. Try another search.',
+            error: tracks.length ? '' : 'No songs found. Try another search.',
           })
         }
       } catch (error) {
@@ -113,6 +113,16 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
     </section>
 
     <section className="block">
+  <h2><ListMusic size={17} /> From your playlists</h2>
+  <RoomPlaylists
+    onPlayTracks={onPlayTracks}
+    onQueueTracks={onQueueTracks}
+    onPlayTrack={onPlayTrack}
+    onQueueTrack={onQueueTrack}
+  />
+</section>
+
+    <section className="block">
       <div className="block-head">
         <h2>Up next <small className="muted">{room.queue.length} {room.queue.length === 1 ? 'song' : 'songs'}</small></h2>
         {room.queue.length > 0 && <button className="btn btn-small" onClick={() => { if (!user) { openAuth('signup'); return } setSaveModalOpen(true) }}>{saved ? <><Check size={14} /> Saved</> : <><Music2 size={14} /> Save as playlist</>}</button>}
@@ -157,4 +167,45 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
     </div>}
     <FeedbackModal title="Something went wrong" message={feedback} onClose={() => setFeedback('')} />
   </main>
+}
+
+function RoomPlaylists({ onPlayTracks, onQueueTracks, onPlayTrack, onQueueTrack }) {
+  const { user, openAuth, playlists, playlistsReady, playlistsError } = useAccount()
+  const [openId, setOpenId] = useState(null)
+
+  if (!user) {
+    return <div className="empty-result-card">
+      <span>Log in to play your saved playlists here.</span>
+      <button className="btn btn-small btn-primary" onClick={() => openAuth('login')}>Log in</button>
+    </div>
+  }
+  if (playlistsError) return <p className="message">{playlistsError}</p>
+  if (!playlistsReady) return <p className="message">Loading your playlists…</p>
+  if (!playlists.length) return <p className="empty">You have no playlists yet. Save songs with the heart button.</p>
+
+  return <ul className="track-list room-playlists">
+    {playlists.map((playlist) => {
+      const open = openId === playlist.id
+      const count = playlist.tracks.length
+      return <li key={playlist.id} className="room-playlist">
+        <div className="track">
+          <button className="track-text as-button" onClick={() => setOpenId(open ? null : playlist.id)} aria-expanded={open}>
+            <strong>{playlist.name}</strong>
+            <small>{count} {count === 1 ? 'song' : 'songs'}</small>
+          </button>
+          <button className="icon-btn" onClick={() => onPlayTracks(playlist.tracks, 0)} disabled={!count} aria-label={`Play ${playlist.name}`} title="Play playlist in room"><Play size={16} fill="currentColor" /></button>
+          <button className="icon-btn add-btn" onClick={() => onQueueTracks(playlist.tracks)} disabled={!count} aria-label={`Add all of ${playlist.name} to queue`} title="Add all to queue"><ListPlus size={17} /></button>
+          <button className="icon-btn" onClick={() => setOpenId(open ? null : playlist.id)} aria-label={open ? 'Hide songs' : 'Show songs'} style={{ transform: open ? 'rotate(180deg)' : 'none' }}><ChevronDown size={17} /></button>
+        </div>
+        {open && <ul className="track-list room-playlist-tracks">
+          {playlist.tracks.map((track) => <li className="track" key={track.id}>
+            <img src={track.thumbnail || `https://i.ytimg.com/vi/${track.id}/mqdefault.jpg`} alt="" loading="lazy" />
+            <div className="track-text"><strong title={track.title}>{track.title}</strong><small>{track.artist}</small></div>
+            <button className="icon-btn" onClick={() => onPlayTrack(track)} aria-label={`Play ${track.title}`} title="Play now"><Play size={16} fill="currentColor" /></button>
+            <button className="icon-btn add-btn" onClick={(event) => onQueueTrack(track, event.currentTarget)} aria-label={`Add ${track.title} to queue`} title="Add to queue"><Plus size={17} /></button>
+          </li>)}
+        </ul>}
+      </li>
+    })}
+  </ul>
 }

@@ -1,18 +1,37 @@
 // src/services/youtube.js
 import { findLyricsForTrack } from './lyrics'
 
+// src/services/youtube.js
 const API = 'https://www.googleapis.com/youtube/v3'
 const REGION = 'PH'
 const CACHE_TTL = 10 * 60 * 1000
-const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY
+const KEYS = (import.meta.env.VITE_YOUTUBE_API_KEYS || import.meta.env.VITE_YOUTUBE_API_KEY || '')
+  .split(',').map((key) => key.trim()).filter(Boolean)
+const QUOTA_REASONS = ['quotaExceeded', 'dailyLimitExceeded', 'RESOURCE_EXHAUSTED']
+const DEAD_KEY = 'jamroom:yt-exhausted'
+
+// YouTube quotas reset at midnight Pacific time, so "exhausted" only lasts for that day.
+const pacificDay = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date())
+
+function readExhausted() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(DEAD_KEY) || 'null')
+    return saved?.day === pacificDay() ? saved.indexes : []
+  } catch { return [] }
+}
+
+function markExhausted(index) {
+  const indexes = [...new Set([...readExhausted(), index])]
+  try { localStorage.setItem(DEAD_KEY, JSON.stringify({ day: pacificDay(), indexes })) } catch { /* optional */ }
+}
 const cache = new Map()
 
 export function searchYouTube(query, signal) {
-  return searchMusic(query, { signal, limit: 8, order: 'relevance', requireSyncedLyrics: true })
+  return searchMusic(query, { signal, limit: 10, order: 'relevance' })
 }
 
 export function searchPopularSongs(query, signal) {
-  return searchMusic(query, { signal, limit: 25, order: 'viewCount', requireSyncedLyrics: true })
+  return searchMusic(query, { signal, limit: 25, order: 'viewCount' })
 }
 
 export function getPopularMusic(regionCode = REGION, signal) {
@@ -24,36 +43,65 @@ export function getPopularMusic(regionCode = REGION, signal) {
       }, signal)
       return (data.items || []).filter((item) => isPlayable(item, regionCode)).slice(0, 8).map(toTrack)
     } catch (error) {
-      // Some regions have no music chart; fall back to the most viewed music videos.
       if (error.reason !== 'videoChartNotFound') throw error
-      return searchMusic('top music hits', { signal, limit: 8, order: 'viewCount', requireSyncedLyrics: false })
+      return searchMusic('top music hits', { signal, limit: 8, order: 'viewCount' })
     }
   })
 }
 
+// ── Song vs. random video ─────────────────────────────────────────────────────
+// Hard no: things that are clearly not a song.
+const NOT_A_SONG = /\b(reaction|reacts?|reacting|review|tutorial|how to|lesson|karaoke|vlog|interview|behind the scenes|trailer|teaser|podcast|compilation|full album|shorts|dance practice|choreography|1 hour|2 hours|10 hours|nightcore|8d audio|asmr)\b/i
+// Soft penalty: usually not the studio version.
+const NOT_STUDIO = /\b(live|cover|slowed|sped up|reverb|concert|remix|acoustic version|instrumental)\b/i
+const IS_AUDIO = /\b(official audio|audio|lyrics?|lyric video|visuali[sz]er)\b/i
+const IS_VIDEO = /\b(official (music )?video|music video|m\/?v)\b/i
+
+// Higher = more like a plain audio upload (e.g. "Artist - Topic" channels).
+// Returns null when the item should be dropped.
+function audioScore(item, seconds) {
+  const title = item.snippet?.title || ''
+  const channel = item.snippet?.channelTitle || ''
+  if (NOT_A_SONG.test(title)) return null
+  if (seconds < 60 || seconds > 720) return null
+
+  let score = 0
+  if (/\s-\s*topic$/i.test(channel)) score += 5
+  if (IS_AUDIO.test(title)) score += 3
+  if (IS_VIDEO.test(title)) score -= 3
+  if (NOT_STUDIO.test(title)) score -= 2
+  return score
+}
+
 // ── Core search ───────────────────────────────────────────────────────────────
-function searchMusic(query, { signal, limit, order, requireSyncedLyrics }) {
-  return cached(`${order}|${requireSyncedLyrics}|${query.toLowerCase()}`, async () => {
+function searchMusic(query, { signal, limit, order }) {
+  return cached(`${order}|${query.toLowerCase()}`, async () => {
     const search = await yt('search', {
       part: 'snippet', type: 'video', videoCategoryId: '10',
       videoEmbeddable: 'true', videoSyndicated: 'true', regionCode: REGION,
-      maxResults: order === 'viewCount' ? '50' : '25', order, q: query,
+      maxResults: '50', order, q: `${query} audio`,
     }, signal)
     const ids = (search.items || []).map((item) => item.id?.videoId).filter(Boolean)
     if (!ids.length) return []
 
-    // videos.list gives clean (un-escaped) titles, duration and view counts.
     const details = await yt('videos', {
       part: 'snippet,status,contentDetails,statistics', id: ids.join(','),
     }, signal)
     const byId = new Map((details.items || []).map((item) => [item.id, item]))
-    const playable = ids
-      .map((id) => byId.get(id))
-      .filter((item) => item && isPlayable(item, REGION))
-      .map(toTrack)
 
-    if (!requireSyncedLyrics) return playable.slice(0, limit)
-    return withLyrics(playable.slice(0, limit * 2), limit, signal)
+    const scored = []
+    ids.forEach((id, index) => {
+      const item = byId.get(id)
+      if (!item || !isPlayable(item, REGION)) return
+      const track = toTrack(item)
+      const score = audioScore(item, track.duration)
+      if (score === null) return
+      scored.push({ track, score, index })
+    })
+
+    // Audio uploads first, then keep YouTube's own order (relevance or views).
+    scored.sort((a, b) => b.score - a.score || a.index - b.index)
+    return scored.slice(0, limit).map((entry) => entry.track)
   })
 }
 
@@ -88,16 +136,33 @@ async function withLyrics(candidates, limit, signal) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 async function yt(path, params, signal) {
-  if (!apiKey) throw new Error('YouTube search needs a VITE_YOUTUBE_API_KEY in .env.')
-  const response = await fetch(`${API}/${path}?${new URLSearchParams({ ...params, key: apiKey })}`, { signal })
-  const data = await response.json().catch(() => ({}))
-  if (!response.ok) {
+  if (!KEYS.length) throw new Error('YouTube search needs a VITE_YOUTUBE_API_KEYS in .env.')
+  const dead = new Set(readExhausted())
+  let lastError = null
+
+  for (let index = 0; index < KEYS.length; index++) {
+    if (dead.has(index)) continue
+    const response = await fetch(`${API}/${path}?${new URLSearchParams({ ...params, key: KEYS[index] })}`, { signal })
+    const data = await response.json().catch(() => ({}))
+    if (response.ok) return data
+
     const reason = data.error?.errors?.[0]?.reason || data.error?.status || ''
     const error = new Error(friendlyError(reason, data.error?.message))
     error.reason = reason
-    throw error
+
+    if (QUOTA_REASONS.includes(reason)) {   // this key is used up: remember it, try the next
+      markExhausted(index)
+      lastError = error
+      continue
+    }
+    if (reason === 'keyInvalid') {          // bad key: skip it for this request
+      lastError = error
+      continue
+    }
+    throw error                             // any other error is real, so show it
   }
-  return data
+
+  throw lastError || Object.assign(new Error(friendlyError('quotaExceeded')), { reason: 'quotaExceeded' })
 }
 
 function friendlyError(reason, fallback) {
@@ -123,7 +188,7 @@ function toTrack(item) {
   return {
     id: item.id,
     title: snippet.title,
-    artist: snippet.channelTitle,
+    artist: snippet.channelTitle.replace(/\s*-\s*topic$/i, ''),
     thumbnail: snippet.thumbnails?.medium?.url || `https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`,
     duration: parseDuration(contentDetails?.duration),
     views: Number(statistics?.viewCount || 0),
