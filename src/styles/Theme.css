@@ -238,10 +238,7 @@ input:focus {
 }
 
 /* ── Room status ── */
-.dot-connected {
-  background: var(--live);
-  animation: live 1.6s infinite;
-}
+.dot-connected { background: var(--live); }
 
 .chip {
   transition: transform 250ms var(--spring), background-color 150ms;
@@ -404,10 +401,7 @@ input:focus {
   color: var(--live);
 }
 
-.appearance-status-dot {
-  background: var(--live);
-  animation: live 1.6s infinite;
-}
+
 
 /* ── Now-playing: swap the teal bits for white/red ── */
 .np-circle:hover:not(:disabled),
@@ -525,7 +519,6 @@ input:focus {
   .queue-track.active::after,
   .home-icon,
   .dot-connected,
-  .appearance-status-dot,
   .playlist-empty-state>svg {
     animation: none;
   }

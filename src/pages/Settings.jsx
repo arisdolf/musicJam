@@ -1,14 +1,27 @@
 // src/pages/Settings.jsx
-import { useState } from 'react'
-import UsernameForm from '../components/UsernameForm'
-import { useAccount } from '../features/account/AccountContext'
-import { User, Lock, LogOut, Trash2, Check, Monitor, AtSign } from 'lucide-react'
+  import { useState } from 'react'
+  import UsernameForm from '../components/UsernameForm'
+  import { useAccount } from '../features/account/AccountContext'
+ import { User, Lock, LogOut, Trash2, Check, Monitor, AtSign, Sun, Moon, Gauge, Users, Bell, ChevronRight, ArrowLeft } from 'lucide-react'
+import Quota from './Quota'
+import Friends from './Friends'
+import { useFriends } from '../features/friends/FriendsContext'
+import { getTheme, applyTheme } from '../utils/theme'
+import { ensureNotificationPermission } from '../utils/notify'
 
 // ADJUST these to match the routes in your server's auth file.
-
-export default function Settings() {
+const THEMES = [
+  { id: 'light',  label: 'Light',  icon: Sun },
+  { id: 'dark',   label: 'Dark',   icon: Moon },
+  { id: 'system', label: 'System', icon: Monitor },
+]
+export default function Settings({ roomCode, section, onSectionChange }) {
+  const { pendingCount } = useFriends()
+  const [theme, setTheme] = useState(getTheme)
+  const [notifPerm, setNotifPerm] = useState(() => 'Notification' in window ? Notification.permission : 'unsupported')
+  const chooseTheme = (mode) => { setTheme(mode); applyTheme(mode) }
   const { user, logOut, updateName, changePassword, deleteAccount } = useAccount()
-
+  
   const [name, setName]           = useState(user?.name || '')
   const [nameSaved, setNameSaved] = useState(false)
   const [nameErr, setNameErr]     = useState('')
@@ -54,22 +67,55 @@ export default function Settings() {
   try { await deleteAccount(currPw) }   // see note below
   catch (err) { setDelErr(err.message); setBusy(false) }
 }
-
+  if (section === 'friends' || section === 'quota') {
+    return <div className="settings-page settings-sub">
+      <button className="btn btn-text settings-back" onClick={() => onSectionChange(null)}><ArrowLeft size={16} /> Settings</button>
+      {section === 'friends' ? <Friends roomCode={roomCode} /> : <Quota />}
+    </div>
+  }
   return (
     <main className="settings-page">
       <h1>Settings</h1>
 
-      <section className="settings-card appearance-card">
-        <div className="settings-card-header"><Monitor size={18} /><h2>Appearance</h2></div>
-        <p className="settings-desc">Jamroom follows your device appearance automatically. Turn on dark mode in your system settings to use the dark theme here.</p>
-        <div className="appearance-status"><span className="appearance-status-dot" /> Following device settings</div>
-      </section>
+      <section className="settings-card">
+  <div className="settings-card-header"><Monitor size={18} /><h2>Appearance</h2></div>
+  <p className="settings-desc">Choose how Jamroom looks. System follows your device.</p>
+  <div className="theme-options" role="radiogroup" aria-label="Theme">
+    {THEMES.map(({ id, label, icon: Icon }) => (
+      <button key={id} type="button" role="radio" aria-checked={theme === id}
+        className={`theme-option${theme === id ? ' active' : ''}`} onClick={() => chooseTheme(id)}>
+        <Icon size={18} /><span>{label}</span>
+      </button>
+    ))}
+  </div>
+</section>
+
+<section className="settings-card">
+  <div className="settings-card-header"><Users size={18} /><h2>Social &amp; usage</h2></div>
+  <button className="settings-row" onClick={() => onSectionChange('friends')}>
+    <Users size={18} /><span>Friends</span>
+    {pendingCount > 0 && <span className="nav-badge">{pendingCount}</span>}
+    <ChevronRight size={17} />
+  </button>
+  <button className="settings-row" onClick={() => onSectionChange('quota')}>
+    <Gauge size={18} /><span>API Quota</span><ChevronRight size={17} />
+  </button>
+</section>
+
+<section className="settings-card">
+  <div className="settings-card-header"><Bell size={18} /><h2>Notifications</h2></div>
+  <p className="settings-desc">Get a phone notification when a friend invites you to a room.</p>
+  {notifPerm === 'granted' && <div className="appearance-status"><Check size={14} /> On</div>}
+  {notifPerm === 'denied' && <p className="settings-desc">Blocked. Allow notifications for this site in your browser settings.</p>}
+  {notifPerm === 'unsupported' && <p className="settings-desc">This browser does not support notifications.</p>}
+  {notifPerm === 'default' && <button className="btn btn-primary" onClick={async () => setNotifPerm(await ensureNotificationPermission())}>Turn on notifications</button>}
+</section>
 
             <section className="settings-card">
         <div className="settings-card-header"><AtSign size={18} /><h2>Username</h2></div>
         <UsernameForm />
       </section>
-      
+
       {/* ── Profile ── */}
       <section className="settings-card">
         <div className="settings-card-header"><User size={18} /><h2>Profile</h2></div>
@@ -124,5 +170,7 @@ export default function Settings() {
         </button>
       </section>
     </main>
+    
   )
+  
 }

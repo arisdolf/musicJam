@@ -275,3 +275,60 @@ export async function matchSong({ title, artist, duration }, signal) {
   })
   return bestScore > 0 ? best : null
 }
+
+// ── Similar songs ─────────────────────────────────────────────────────────────
+const LANGUAGES = [
+  [/tagalog|opm|filipino|pinoy|p-?pop|\b(ikaw|ako|kita|sayo|pag-ibig|bakit|ngayon|walang|tayo|puso)\b/i, 'OPM Tagalog'],
+  [/k-?pop|korean/i, 'K-pop'],
+  [/j-?pop|japanese/i, 'J-pop'],
+]
+const MOODS = [
+  [/\b(sad|hugot|heartbreak|broken|cry|iyak|luha|lonely|miss you|sakit|goodbye|paalam)\b/i, 'sad'],
+  [/\b(chill|lofi|lo-fi|relax|calm|acoustic)\b/i, 'chill acoustic'],
+  [/\b(love|romantic|romance|mahal|kilig|serenade)\b/i, 'love'],
+  [/\b(party|dance|upbeat|energetic|hype)\b/i, 'upbeat'],
+]
+const GENRES = [
+  [/\b(r&b|rnb)\b/i, 'R&B'], [/\b(hip[- ]?hop|rap)\b/i, 'hip hop'], [/\brock\b/i, 'rock'],
+  [/\bindie\b/i, 'indie'], [/\bballad\b/i, 'ballad'], [/\b(edm|electronic)\b/i, 'EDM'], [/\bpop\b/i, 'pop'],
+]
+const pick = (list, text) => list.find(([pattern]) => pattern.test(text))?.[1] || ''
+const titleKey = (title) => title.toLowerCase().replace(/[^a-z0-9]/g, '')
+
+export function getSimilarTracks(seed, signal) {
+  return cached(`similar|${seed.id}`, async () => {
+    let text = `${seed.title} ${seed.artist}`
+    try {
+      const data = await yt('videos', { part: 'snippet', id: seed.id }, signal)
+      const snippet = data.items?.[0]?.snippet
+      if (snippet) text += ` ${(snippet.tags || []).join(' ')} ${(snippet.description || '').slice(0, 600)}`
+    } catch (error) { if (error.name === 'AbortError') throw error }
+
+    const lang = pick(LANGUAGES, text)
+    const mood = pick(MOODS, text)
+    const genre = pick(GENRES, text)
+    const vibe = [mood, genre].filter(Boolean).join(' ')
+
+    const mainQuery = lang || mood ? `${[lang, mood, genre].filter(Boolean).join(' ')} songs` : `${seed.artist} ${genre} songs`.replace(/\s+/g, ' ')
+    const mixQuery = lang ? `english ${vibe || 'pop'} songs` : `songs like ${seed.artist}`
+
+    const [main, mix] = await Promise.all([
+      searchMusic(mainQuery, { signal, limit: 40, order: 'relevance' }),
+      searchMusic(mixQuery, { signal, limit: 15, order: 'relevance' }),
+    ])
+
+    // Roughly 3 songs from the main vibe, then 1 from the mix, until there are 25.
+    const out = []
+    const seen = new Set([seed.id, titleKey(seed.title)])
+    const push = (track) => {
+      if (!track || seen.has(track.id) || seen.has(titleKey(track.title))) return
+      seen.add(track.id); seen.add(titleKey(track.title)); out.push(track)
+    }
+    let i = 0, j = 0
+    while (out.length < 25 && (i < main.length || j < mix.length)) {
+      for (let k = 0; k < 3 && i < main.length && out.length < 25; k++) push(main[i++])
+      if (j < mix.length && out.length < 25) push(mix[j++])
+    }
+    return out
+  })
+}

@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { FriendsProvider } from './features/friends/FriendsContext'
-import Friends from './pages/Friends'
+
 import InviteToasts from './components/InviteToasts'
 import { AccountProvider } from './features/account/AccountContext'
 import { PlaybackProvider, usePlayback } from './features/playback/PlaybackContext'
@@ -12,7 +12,7 @@ import AuthModal from './components/AuthModal'
 import JoinRoom from './components/JoinRoom'
 import MusicRoom from './components/MusicRoom'
 import Playlists from './pages/Playlists'
-import Quota from './pages/Quota'
+
 import RecentRooms from './pages/RecentRooms'
 import Settings from './pages/Settings'
 import PersistentPlayer from './components/PersistentPlayer'
@@ -33,10 +33,10 @@ function Shell() {
   } = usePlayback()
   const [view, setView]           = useState('home')   // 'home'|'playlists'|'quota'|'recent'|'settings'
   const [roomCode, setRoomCode]   = useState(() => new URLSearchParams(window.location.search).get('room')?.toUpperCase() || '')
-  const [navOpen, setNavOpen]     = useState(false)
+ const [settingsSection, setSettingsSection] = useState(null) // null | 'friends' | 'quota'
   const [queueFly, setQueueFly]   = useState(null)
   const queueFlyCounter = useRef(0)
-
+const openFriends = useCallback(() => { setSettingsSection('friends'); setView('settings') }, [])
   const { room, updateRoom, connection, members, serverNow } = useRoom(roomCode)
   const roomQueue = room.queue
   const roomCurrent = room.current
@@ -48,7 +48,7 @@ function Shell() {
     window.history.pushState({}, '', url)
     setRoomCode(code)
   }, [])
-
+  
   const joinRoom = useCallback((code) => {
     setView('home')
     setUrlRoom(code)
@@ -58,7 +58,7 @@ function Shell() {
   useEffect(() => {
     const open = (detail) => {
       if (detail?.roomCode) joinRoom(detail.roomCode)
-      else setView('friends')
+      else openFriends()
     }
     const onWindow = (event) => open(event.detail)
     const onWorker = (event) => { if (event.data?.type === 'jamroom:notification') open(event.data.data) }
@@ -68,9 +68,9 @@ function Shell() {
       window.removeEventListener('jamroom:notification', onWindow)
       navigator.serviceWorker?.removeEventListener('message', onWorker)
     }
-  }, [joinRoom])
+  }, [joinRoom, openFriends])
 
-
+  
   const leaveRoom = useCallback(() => {
     if (!roomQueue.length) {
       setUrlRoom('')
@@ -89,9 +89,10 @@ function Shell() {
     setUrlRoom('')
   }, [updateLocalPlayback, localPlaybackState.queue, roomQueue, roomCurrent, roomPlaying, setUrlRoom])
 
-  const navigate = useCallback((id) => {
-    if (id !== view) setView(id)
-  }, [view])
+const navigate = useCallback((id) => {
+  if (id === 'settings') setSettingsSection(null)
+  if (id !== view) setView(id)
+}, [view])
 
   const roomPlaybackActive = Boolean(roomCode && roomQueue.length)
   const playbackState = roomPlaybackActive ? room : localPlaybackState
@@ -168,48 +169,48 @@ function Shell() {
     }
     switch (view) {
       case 'playlists': return <Playlists onBrowse={() => navigate('home')} onPlayTracks={playTracks} onQueueTrack={queueTrack} />
-      case 'quota':     return <Quota />
+      
       case 'recent':    return <RecentRooms onJoin={joinRoom} />
-       case 'friends':   return <Friends roomCode={roomCode} />
-      case 'settings':  return user ? <Settings /> : null
+       
+      case 'settings':  return user ? <Settings roomCode={roomCode} section={settingsSection} onSectionChange={setSettingsSection} /> : null
       default:          return <JoinRoom onJoin={joinRoom} />
     }
   }
 
   return (
-    <div className={`app-shell${playbackState.queue.length ? ' has-player' : ''}`}>
-      <Sidenav view={view} onNavigate={navigate} open={navOpen} onClose={() => setNavOpen(false)} />
+  <div className={`app-shell${playbackState.queue.length ? ' has-player' : ''}`}>
+    <Sidenav view={view} onNavigate={navigate} />
 
-      <div className="app-content">
-        <Topbar onMenuOpen={() => setNavOpen(true)} />
-        <ErrorBoundary label="The player">
-          <PersistentPlayer
-            playback={playbackState}
-            onPlaybackChange={updateActivePlayback}
-            onNavigate={navigate}
-            onPlayTrack={playTrack}
-            onQueueTrack={queueTrack}
-            sync={sync}
-          />
+    <div className="app-content">
+      <Topbar />
+      <ErrorBoundary label="The player">
+        <PersistentPlayer
+          playback={playbackState}
+          onPlaybackChange={updateActivePlayback}
+          onNavigate={navigate}
+          onPlayTrack={playTrack}
+          onQueueTrack={queueTrack}
+          sync={sync}
+        />
+      </ErrorBoundary>
+
+      <QueueFly motion={queueFly} onComplete={completeQueueFly} />
+      <div className="app-body">
+        <ErrorBoundary label="This page" resetKey={`${view}:${roomCode || 'local'}`}>
+          <div className="route-stage" key={`${view}:${roomCode || 'local'}`}>
+            {renderContent()}
+          </div>
         </ErrorBoundary>
-
-        <QueueFly motion={queueFly} onComplete={completeQueueFly} />
-        <div className="app-body">
-          <ErrorBoundary label="This page" resetKey={`${view}:${roomCode || 'local'}`}>
-            <div className="route-stage" key={`${view}:${roomCode || 'local'}`}>
-              {renderContent()}
-            </div>
-          </ErrorBoundary>
-        </div>
-        <BottomNav view={view} onNavigate={navigate} />
       </div>
-            <InviteToasts onJoin={joinRoom} onOpenFriends={() => navigate('friends')} />
-    
-      <AuthModal />
+      <BottomNav view={view} onNavigate={navigate} />
     </div>
-  )
+
+    <InviteToasts onJoin={joinRoom} onOpenFriends={openFriends} />
+    <AuthModal />
+  </div>
+)
 }
 
 export default function App() {
-  return <AccountProvider><FriendsProvider><PlaybackProvider><Shell /></PlaybackProvider></FriendsProvider></AccountProvider>
+  return  <AccountProvider><FriendsProvider><PlaybackProvider><Shell /></PlaybackProvider></FriendsProvider></AccountProvider>
 }

@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react'
-import { searchYouTube } from '../services/youtube'
+import { searchYouTube, getSimilarTracks } from '../services/youtube'
 import AddToPlaylist from './AddToPlaylist'
 import FeedbackModal from './FeedbackModal'
 import { useAccount } from '../features/account/AccountContext'
 import ConfirmModal from './ConfirmModal'
 import { useDragReorder } from '../hooks/useDragReorder'
 import InviteFriendsModal from './InviteFriendsModal'
-import { Play, Search, Music2, Check, X, Plus, GripVertical, ArrowUp, ArrowDown,  ListMusic, ListPlus, ChevronDown, LogOut, UserPlus } from 'lucide-react'
+import { Play, Search, Music2, Check, X, Plus, GripVertical, ArrowUp, ArrowDown,  ListMusic, ListPlus, ChevronDown, LogOut, UserPlus, Sparkles } from 'lucide-react'
 
 export default function MusicRoom({ roomCode, room, updateRoom, connection, members, onLeave, onPlayTrack, onQueueTrack, onPlayTracks, onQueueTracks }) {
   const { user, openAuth, createPlaylist } = useAccount()
+  const [playlistsOpen, setPlaylistsOpen] = useState(false)
+const [seed, setSeed] = useState(null)
+const [similar, setSimilar] = useState({ seedId: '', tracks: [], loading: false, error: '' })
+const queueIds = room.queue.map((track) => track.id)
   const [query, setQuery] = useState('')
   const [searchState, setSearchState] = useState({ query: '', results: [], searching: false, error: '' })
   const [copied, setCopied] = useState(false)
@@ -48,6 +52,28 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
     }, 300)
     return () => { clearTimeout(timer); controller.abort() }
   }, [normalizedQuery])
+
+  useEffect(() => {
+  const only = room.queue.length === 1 ? room.queue[0] : null
+  setSeed((prev) => {
+    if (only) return prev?.id === only.id ? prev : only
+    return prev && room.queue.some((track) => track.id === prev.id) ? prev : null
+  })
+}, [room.queue])
+
+useEffect(() => {
+  if (!seed) return undefined
+  const controller = new AbortController()
+  setSimilar({ seedId: seed.id, tracks: [], loading: true, error: '' })
+  getSimilarTracks(seed, controller.signal)
+    .then((tracks) => {
+      if (!controller.signal.aborted) setSimilar({ seedId: seed.id, tracks, loading: false, error: tracks.length ? '' : 'No similar songs found.' })
+    })
+    .catch((error) => {
+      if (error.name !== 'AbortError' && !controller.signal.aborted) setSimilar({ seedId: seed.id, tracks: [], loading: false, error: error.message || 'Could not load similar songs.' })
+    })
+  return () => controller.abort()
+}, [seed])
 
   const moveTrack = (from, to) => updateRoom((state) => {
     if (from < 0 || to < 0 || from >= state.queue.length || to >= state.queue.length || from === to) return state
@@ -90,19 +116,14 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
 
   return <main className="page room">
     <div className="room-bar">
-      <button className="btn btn-small btn-leave" onClick={() => setLeaveOpen(true)}><LogOut size={15} /> Leave</button>
-      <button className="btn btn-small btn-leave" onClick={() => setInviteOpen(true)}><UserPlus size={15} /> Invite</button>
-      <div className="room-meta">
-                
-        <span className={`dot dot-${connection}`} aria-hidden="true" />
-        
-        <span>{status} · {members} {members === 1 ? 'listener' : 'listeners'}</span>
-        
-        <button className="chip" onClick={shareCode} title="Copy room code">{copied ? <><Check size={13} /> Copied</> : roomCode}</button>
-        
-      </div>
-    </div>
-
+  <button className="btn btn-small btn-leave" onClick={() => setLeaveOpen(true)}><LogOut size={15} /> Leave</button>
+  <button className="btn btn-small btn-primary" onClick={() => setInviteOpen(true)}><UserPlus size={15} /> Invite</button>
+</div>
+<div className="room-meta room-meta-row">
+  <span className={`dot dot-${connection}`} aria-hidden="true" />
+  <span>{status} · {members} {members === 1 ? 'listener' : 'listeners'}</span>
+  <button className="chip" onClick={shareCode} title="Copy room code">{copied ? <><Check size={13} /> Copied</> : roomCode}</button>
+</div>
     <section className="block">
       <h2><Search size={17} /> Add a song</h2>
       <input className="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search songs or artists" aria-label="Search songs or artists" />
@@ -118,15 +139,34 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
             </div>)}
       </div>}
     </section>
-
+          {seed && similar.seedId === seed.id && <section className="block">
+  <div className="block-head">
+    <h2><Sparkles size={17} /> Similar vibes</h2>
+    {similar.tracks.length > 0 && <button className="btn btn-small" onClick={() => onQueueTracks(similar.tracks)}><ListPlus size={14} /> Add all</button>}
+  </div>
+  <div className="results similar-results">
+    {similar.loading ? <p className="message">Finding songs with the same vibe…</p>
+      : similar.error ? <p className="message">{similar.error}</p>
+      : similar.tracks.map((track) => {
+          const queued = queueIds.includes(track.id)
+          return <div className="track" key={track.id}>
+            <img src={track.thumbnail} alt="" />
+            <div className="track-text"><strong>{track.title}</strong><small>{track.artist}</small></div>
+            <AddToPlaylist track={track} />
+            <button className="icon-btn" onClick={() => onPlayTrack(track)} aria-label={`Play ${track.title}`} title="Play now"><Play size={16} fill="currentColor" /></button>
+            <button className="icon-btn add-btn" disabled={queued} onClick={(event) => onQueueTrack(track, event.currentTarget)} aria-label={`Add ${track.title} to queue`} title={queued ? 'In queue' : 'Add to queue'}>{queued ? <Check size={16} /> : <Plus size={17} />}</button>
+          </div>
+        })}
+  </div>
+</section>}
     <section className="block">
-  <h2><ListMusic size={17} /> From your playlists</h2>
-  <RoomPlaylists
-    onPlayTracks={onPlayTracks}
-    onQueueTracks={onQueueTracks}
-    onPlayTrack={onPlayTrack}
-    onQueueTrack={onQueueTrack}
-  />
+  <button className="block-toggle" onClick={() => setPlaylistsOpen((open) => !open)} aria-expanded={playlistsOpen}>
+    <span><ListMusic size={17} /> From your playlists</span>
+    <ChevronDown size={18} className={playlistsOpen ? 'flip' : ''} />
+  </button>
+  {playlistsOpen && <div className="dropdown-panel">
+    <RoomPlaylists onPlayTracks={onPlayTracks} onQueueTracks={onQueueTracks} onPlayTrack={onPlayTrack} onQueueTrack={onQueueTrack} />
+  </div>}
 </section>
 
     <section className="block">

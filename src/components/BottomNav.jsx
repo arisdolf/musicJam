@@ -4,15 +4,12 @@ import { useAccount } from '../features/account/AccountContext'
 import { useFriends } from '../features/friends/FriendsContext'
 
 const NAV_GUEST = [
-  { id: 'home',    label: 'Home',    icon: Home },
-  { id: 'quota',     label: 'Quota',     icon: Gauge },
-  { id: 'recent',  label: 'Rooms',   icon: History },
+  { id: 'home',   label: 'Home', icon: Home },
+  { id: 'recent', label: 'Rooms', icon: History },
 ]
 const NAV_AUTH = [
   { id: 'home',      label: 'Home',      icon: Home },
   { id: 'playlists', label: 'Playlists', icon: ListMusic },
-    { id: 'friends',   label: 'Friends',   icon: Users },
-  { id: 'quota',     label: 'Quota',     icon: Gauge },
   { id: 'recent',    label: 'Rooms',     icon: History },
   { id: 'settings',  label: 'Settings',  icon: Settings },
 ]
@@ -33,7 +30,7 @@ export default function BottomNav({ view, onNavigate }) {
         >
           <Icon size={22} />
           <span>{label}</span>
-           {id === 'friends' && pendingCount > 0 && <span className="nav-badge">{pendingCount}</span>}
+           {id === 'settings' && pendingCount > 0 && <span className="nav-badge">{pendingCount}</span>}
         </button>
       ))}
     </nav>

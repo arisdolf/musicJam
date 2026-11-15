@@ -1,12 +1,30 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Headphones, UserPlus, X } from 'lucide-react'
 import { useAccount } from '../features/account/AccountContext'
 import { useFriends } from '../features/friends/FriendsContext'
+import { showSystemNotification } from '../utils/notify'
 
 export default function InviteToasts({ onJoin, onOpenFriends }) {
   const { user } = useAccount()
   const { invites, requests, dismissInvite } = useFriends()
   const [hiddenRequests, setHiddenRequests] = useState(false)
+  const notified = useRef(new Set()) // invite ids that already got a phone notification
+
+  // Phone notification for each new invite (only once per invite).
+  useEffect(() => {
+    if (!user) return
+    for (const invite of invites) {
+      if (notified.current.has(invite.id)) continue
+      notified.current.add(invite.id)
+      showSystemNotification({
+        title: `${invite.fromName} invited you to jam`,
+        body: `Join room ${invite.roomCode}`,
+        roomCode: invite.roomCode,
+        tag: `invite-${invite.id}`,
+      })
+    }
+  }, [user, invites])
+
   const showRequests = requests.length > 0 && !hiddenRequests
   if (!user || (!invites.length && !showRequests)) return null
 

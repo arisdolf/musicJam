@@ -1,18 +1,21 @@
-// src/components/Topbar.jsx — phone header: menu button, centred logo, empty right cell
-import { Menu, Music2 } from 'lucide-react'
+import { Music2 } from 'lucide-react'
+import { useAccount } from '../features/account/AccountContext'
 
-export default function Topbar({ onMenuOpen }) {
+export default function Topbar() {
+  const { user, openAuth } = useAccount()
   return (
-    <header className="topbar">
-      <button className="topbar-menu-btn" onClick={onMenuOpen} aria-label="Open menu">
-        <Menu size={22} />
-      </button>
+    <header className={`topbar${user ? '' : ' topbar-guest'}`}>
+      {user && <span aria-hidden="true" />}
       <div className="topbar-logo">
         <span className="logo-mark"><Music2 size={16} strokeWidth={2.4} /></span>
         <span>jamroom</span>
       </div>
-      {/* Empty third grid cell keeps the logo centred. */}
-      <span aria-hidden="true" />
+      {user
+        ? <span aria-hidden="true" />
+        : <div className="topbar-auth">
+            <button className="btn btn-text btn-small" onClick={() => openAuth('login')}>Log in</button>
+            <button className="btn btn-primary btn-small" onClick={() => openAuth('signup')}>Sign up</button>
+          </div>}
     </header>
   )
 }

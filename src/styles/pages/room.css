@@ -14,3 +14,14 @@
 .room-playlist > .track { border-bottom: 0; }
 .room-playlist-tracks { margin: 0 0 8px 14px; border-left: 2px solid var(--line); }
 .room-playlist-tracks .track:last-child { border-bottom: 0; }
+
+.room-bar { flex-wrap: nowrap; }
+.room-meta-row { margin: -4px 0 14px; }
+
+.block-toggle { width: 100%; height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); font-size: 15px; font-weight: 700; }
+.block-toggle > span { display: flex; align-items: center; gap: 8px; }
+.block-toggle svg:last-child { transition: transform 250ms var(--ease-out); color: var(--muted); }
+.block-toggle svg.flip { transform: rotate(180deg); }
+.dropdown-panel { margin-top: 8px; max-height: 340px; overflow-y: auto; overscroll-behavior: contain; animation: enter 260ms var(--ease-out) backwards; }
+
+.similar-results { max-height: 420px; overflow-y: auto; overscroll-behavior: contain; }

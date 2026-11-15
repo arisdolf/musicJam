@@ -26,7 +26,7 @@
   --pop: .94;         /* start scale for popups */
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     color-scheme: dark;
     --bg: #0a0a0b; --surface: #151516; --ink: #f7f7f7; --muted: #a4a4a8; --line: #2a2a2c;
     --accent: #c2202f; --accent-dark: #ff8f98; --accent-hover: #a71a27; --accent-soft: #2a1013;
@@ -37,6 +37,17 @@
     --glow: 0 8px 28px rgba(220,40,55,.4);
     --shadow-pop: 0 18px 50px rgba(0,0,0,.55);
   }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0a0a0b; --surface: #151516; --ink: #f7f7f7; --muted: #a4a4a8; --line: #2a2a2c;
+  --accent: #c2202f; --accent-dark: #ff8f98; --accent-hover: #a71a27; --accent-soft: #2a1013;
+  --accent-2: #ff8a80; --live: #4be39b;
+  --danger: #ff9b6b; --danger-hover: #ffb08a; --on-danger: #2a0d05; --danger-bg: #2a1410; --danger-line: #6b3320;
+  --scrim: rgba(0,0,0,.72);
+  --spot: linear-gradient(135deg, #9c0f1f, #d02a35);
+  --glow: 0 8px 28px rgba(220,40,55,.4);
+  --shadow-pop: 0 18px 50px rgba(0,0,0,.55);
 }
 /* Reduced motion: nothing travels or scales, fades still play. */
 @media (prefers-reduced-motion: reduce) { :root { --shift: 0px; --pop: 1; } }

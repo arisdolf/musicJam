@@ -10,4 +10,12 @@
 .topbar-menu-btn { justify-self: start; width: 40px; height: 40px; border: 0; background: none; border-radius: 10px; display: grid; place-items: center; color: var(--ink); }
 .topbar-menu-btn:hover { background: var(--surface); }
 
-@media (min-width: 768px) { .topbar { display: none; } }
+.topbar-auth { display: flex; align-items: center; gap: 8px; }
+.topbar-guest { grid-template-columns: 1fr auto; }
+.topbar-guest .topbar-logo { justify-content: flex-start; }
+
+@media (min-width: 768px) {
+  .topbar:not(.topbar-guest) { display: none; }
+  .topbar-guest { grid-template-columns: 1fr; justify-items: end; border-bottom: 0; background: transparent; backdrop-filter: none; }
+  .topbar-guest .topbar-logo { display: none; }
+}
