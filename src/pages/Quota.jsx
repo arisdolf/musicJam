@@ -57,8 +57,8 @@ export default function Quota() {
       })}
     </ul>
 
-    <p className="muted quota-note">Counted in this browser only. A search costs about 101 units (100 for the search, 1 for the video details). Check Google Cloud Console for exact numbers.</p>
-    {serverKeyOnly && <p className="muted quota-note">Your keys live on the server, so they show as one. Set VITE_YOUTUBE_API_KEYS (comma separated) to list each key.</p>}
+    <p className="muted quota-note">Counted in this browser only. A search costs about 101 units (100 for the search, 1 for the video details).</p>
+    {serverKeyOnly && <p className="muted quota-note">Your keys live on the server, so they show as one.</p>}
     <button className="btn btn-small btn-text" onClick={resetQuota}><RotateCcw size={14} /> Reset local counter</button>
   </main>
 }
