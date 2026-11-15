@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { searchYouTube, getSimilarTracks } from '../services/youtube'
 import AddToPlaylist from './AddToPlaylist'
 import FeedbackModal from './FeedbackModal'
@@ -29,6 +29,9 @@ const queueIds = room.queue.map((track) => track.id)
   const searching = Boolean(normalizedQuery && (!searchHasResult || searchState.searching))
   const searchError = searchHasResult ? searchState.error : ''
   const [inviteOpen, setInviteOpen] = useState(false)
+  const autoAdded = useRef(new Set())                 // songs we already auto-queued suggestions for
+const latest = useRef({ queue: room.queue, onQueueTracks })
+useEffect(() => { latest.current = { queue: room.queue, onQueueTracks } })
   useEffect(() => {
     if (!normalizedQuery) return undefined
     const controller = new AbortController()
@@ -67,10 +70,20 @@ useEffect(() => {
   setSimilar({ seedId: seed.id, tracks: [], loading: true, error: '' })
   getSimilarTracks(seed, controller.signal)
     .then((tracks) => {
-      if (!controller.signal.aborted) setSimilar({ seedId: seed.id, tracks, loading: false, error: tracks.length ? '' : 'No similar songs found.' })
+      if (controller.signal.aborted) return
+      setSimilar({ seedId: seed.id, tracks, loading: false, error: tracks.length ? '' : 'No similar songs found.' })
+
+      // Auto-add to the queue, but only once per song, and only if that song is still alone in the queue.
+      const { queue, onQueueTracks: addAll } = latest.current
+      if (tracks.length && !autoAdded.current.has(seed.id) && queue.length === 1 && queue[0].id === seed.id) {
+        autoAdded.current.add(seed.id)
+        addAll(tracks)
+      }
     })
     .catch((error) => {
-      if (error.name !== 'AbortError' && !controller.signal.aborted) setSimilar({ seedId: seed.id, tracks: [], loading: false, error: error.message || 'Could not load similar songs.' })
+      if (error.name !== 'AbortError' && !controller.signal.aborted) {
+        setSimilar({ seedId: seed.id, tracks: [], loading: false, error: error.message || 'Could not load similar songs.' })
+      }
     })
   return () => controller.abort()
 }, [seed])

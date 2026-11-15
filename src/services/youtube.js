@@ -292,11 +292,17 @@ const GENRES = [
   [/\b(r&b|rnb)\b/i, 'R&B'], [/\b(hip[- ]?hop|rap)\b/i, 'hip hop'], [/\brock\b/i, 'rock'],
   [/\bindie\b/i, 'indie'], [/\bballad\b/i, 'ballad'], [/\b(edm|electronic)\b/i, 'EDM'], [/\bpop\b/i, 'pop'],
 ]
+
+const MIN_VIEWS = 1_000_000        // strict: songs that are actually known
+const RELAXED_VIEWS = 200_000      // fallback if the strict list is too short
+const BAD_VERSION = /\b(live|cover|remix|slowed|sped up|reverb|karaoke|instrumental|acoustic version|nightcore|8d|mashup|medley|tribute|loop)\b/i
+const FOREIGN_SCRIPT = /[\u0400-\u04FF\u0590-\u06FF\u0900-\u0DFF\u0E00-\u0E7F\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]/
+
 const pick = (list, text) => list.find(([pattern]) => pattern.test(text))?.[1] || ''
 const titleKey = (title) => title.toLowerCase().replace(/[^a-z0-9]/g, '')
 
 export function getSimilarTracks(seed, signal) {
-  return cached(`similar|${seed.id}`, async () => {
+  return cached(`similar2|${seed.id}`, async () => {
     let text = `${seed.title} ${seed.artist}`
     try {
       const data = await yt('videos', { part: 'snippet', id: seed.id }, signal)
@@ -308,26 +314,41 @@ export function getSimilarTracks(seed, signal) {
     const mood = pick(MOODS, text)
     const genre = pick(GENRES, text)
     const vibe = [mood, genre].filter(Boolean).join(' ')
+    const allowForeign = lang === 'K-pop' || lang === 'J-pop' || FOREIGN_SCRIPT.test(`${seed.title} ${seed.artist}`)
 
-    const mainQuery = lang || mood ? `${[lang, mood, genre].filter(Boolean).join(' ')} songs` : `${seed.artist} ${genre} songs`.replace(/\s+/g, ' ')
-    const mixQuery = lang ? `english ${vibe || 'pop'} songs` : `songs like ${seed.artist}`
+    // "hits" / "best" nudges YouTube toward famous songs instead of random uploads.
+    const mainQuery = lang || mood
+      ? `${[lang, mood, genre].filter(Boolean).join(' ')} hits`
+      : `${seed.artist} ${genre} best songs`.replace(/\s+/g, ' ')
+    const mixQuery = lang ? `popular english ${vibe || 'pop'} hits` : `songs like ${seed.artist} hits`
 
     const [main, mix] = await Promise.all([
-      searchMusic(mainQuery, { signal, limit: 40, order: 'relevance' }),
-      searchMusic(mixQuery, { signal, limit: 15, order: 'relevance' }),
+      searchMusic(mainQuery, { signal, limit: 50, order: 'relevance' }),
+      searchMusic(mixQuery, { signal, limit: 30, order: 'relevance' }),
     ])
 
-    // Roughly 3 songs from the main vibe, then 1 from the mix, until there are 25.
     const out = []
     const seen = new Set([seed.id, titleKey(seed.title)])
+    const good = (track, minViews, foreignOk) =>
+      (track.views || 0) >= minViews
+      && !BAD_VERSION.test(track.title)
+      && (foreignOk || !FOREIGN_SCRIPT.test(`${track.title} ${track.artist}`))
     const push = (track) => {
-      if (!track || seen.has(track.id) || seen.has(titleKey(track.title))) return
+      if (seen.has(track.id) || seen.has(titleKey(track.title))) return
       seen.add(track.id); seen.add(titleKey(track.title)); out.push(track)
     }
-    let i = 0, j = 0
-    while (out.length < 25 && (i < main.length || j < mix.length)) {
-      for (let k = 0; k < 3 && i < main.length && out.length < 25; k++) push(main[i++])
-      if (j < mix.length && out.length < 25) push(mix[j++])
+
+    // Pass 1: very well-known songs only. Pass 2 relaxes the view count only if we are short of 25.
+    for (const minViews of [MIN_VIEWS, RELAXED_VIEWS]) {
+      if (out.length >= 25) break
+      const a = main.filter((t) => good(t, minViews, allowForeign))
+      const b = mix.filter((t) => good(t, minViews, false)) // the English mix never includes foreign scripts
+      let i = 0, j = 0
+      // About 3 from the main vibe, then 1 from the English mix.
+      while (out.length < 25 && (i < a.length || j < b.length)) {
+        for (let k = 0; k < 3 && i < a.length && out.length < 25; k++) push(a[i++])
+        if (j < b.length && out.length < 25) push(b[j++])
+      }
     }
     return out
   })
