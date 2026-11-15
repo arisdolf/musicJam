@@ -1,6 +1,6 @@
 // src/services/youtube.js
 import { findLyricsForTrack } from './lyrics'
-
+const API_BASE = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '')
 const REGION = 'PH'
 const CACHE_TTL = 10 * 60 * 1000
 const KEYS = (import.meta.env.VITE_YOUTUBE_API_KEYS || import.meta.env.VITE_YOUTUBE_API_KEY || '')
@@ -194,7 +194,7 @@ async function yt(path, params, signal) {
 
     const query = new URLSearchParams({ path, ...params })
     if (KEYS.length) query.set('keyIndex', String(index))
-    const response = await fetch(`/api/youtube?${query}`, { signal })
+    const response = await fetch(`${API_BASE}/api/youtube?${query}`, { signal })
     const data = await response.json().catch(() => ({}))
 
     if (response.ok) { addUsage(index, cost); return data }
