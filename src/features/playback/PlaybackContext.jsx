@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
-
+import { playNow } from '../../utils/queue'
 const PlaybackContext = createContext(null)
 const STORAGE_KEY = 'jamroom:playback'
 const EMPTY_PLAYBACK = { queue: [], current: 0, playing: false }
@@ -42,13 +42,9 @@ export function PlaybackProvider({ children }) {
   } catch (error) { console.warn('Player not ready:', error) }
 }, [])
 
-  const playTrack = useCallback((track) => {
+   const playTrack = useCallback((track) => {
     if (!track?.id) return
-    updatePlayback((current) => {
-      const existingIndex = current.queue.findIndex((item) => item.id === track.id)
-      const queue = existingIndex >= 0 ? current.queue : [...current.queue, track]
-      return { ...current, queue, current: existingIndex >= 0 ? existingIndex : queue.length - 1, playing: true }
-    })
+    updatePlayback((current) => playNow(current, [track]))
     startVideo(track.id)
   }, [startVideo, updatePlayback])
 
@@ -60,11 +56,11 @@ export function PlaybackProvider({ children }) {
   }, [updatePlayback])
 
   const playTracks = useCallback((tracks, index = 0) => {
-    const queue = Array.isArray(tracks) ? tracks.filter((track) => track?.id) : []
-    if (!queue.length) return
-    const current = Math.max(0, Math.min(index, queue.length - 1))
-    updatePlayback({ queue, current, playing: true })
-    startVideo(queue[current].id)
+    const list = Array.isArray(tracks) ? tracks : []
+    const i = Math.max(0, Math.min(index, list.length - 1))
+    if (!list[i]?.id) return
+    updatePlayback((current) => playNow(current, list, i))
+    startVideo(list[i].id)
   }, [startVideo, updatePlayback])
 
   return <PlaybackContext.Provider value={{ state, updatePlayback, registerPlayer, startVideo, playTrack, addToQueue, playTracks }}>

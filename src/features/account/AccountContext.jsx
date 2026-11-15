@@ -4,7 +4,7 @@ import {
   onAuthStateChanged, signOut, updateProfile, EmailAuthProvider, reauthenticateWithCredential,
   updatePassword, deleteUser,
 } from 'firebase/auth'
-import { ref, onValue, push, set, remove } from 'firebase/database'
+import { ref, onValue, push, set, remove, get } from 'firebase/database'
 import { auth, db } from '../../services/firebase'
 
 const AccountContext = createContext(null)
@@ -109,9 +109,13 @@ export function AccountProvider({ children }) {
     await updatePassword(auth.currentUser, newPassword)
   }, [])
 
-  const deleteAccount = useCallback(async (password) => {
+    const deleteAccount = useCallback(async (password) => {
     const u = auth.currentUser
     if (u.providerData.some((p) => p.providerId === 'password')) await reauth(password)
+    const name = await get(ref(db, `users/${u.uid}/username`))
+    if (name.exists()) await remove(ref(db, `usernames/${name.val()}`))
+    await remove(ref(db, `users/${u.uid}`))
+    await remove(ref(db, `friends/${u.uid}`))
     await remove(ref(db, `playlists/${u.uid}`))
     await deleteUser(u)
   }, [])

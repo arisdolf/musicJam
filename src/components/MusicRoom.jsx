@@ -3,7 +3,10 @@ import { searchYouTube } from '../services/youtube'
 import AddToPlaylist from './AddToPlaylist'
 import FeedbackModal from './FeedbackModal'
 import { useAccount } from '../features/account/AccountContext'
-import { Play, Search, Music2, Check, X, Plus, GripVertical, ArrowUp, ArrowDown, ListMusic, ListPlus, ChevronDown } from 'lucide-react'
+import ConfirmModal from './ConfirmModal'
+import { useDragReorder } from '../hooks/useDragReorder'
+import InviteFriendsModal from './InviteFriendsModal'
+import { Play, Search, Music2, Check, X, Plus, GripVertical, ArrowUp, ArrowDown,  ListMusic, ListPlus, ChevronDown, LogOut, UserPlus } from 'lucide-react'
 
 export default function MusicRoom({ roomCode, room, updateRoom, connection, members, onLeave, onPlayTrack, onQueueTrack, onPlayTracks, onQueueTracks }) {
   const { user, openAuth, createPlaylist } = useAccount()
@@ -15,13 +18,13 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
   const [playlistName, setPlaylistName] = useState('My playlist')
   const [savingQueue, setSavingQueue] = useState(false)
   const [feedback, setFeedback] = useState('')
-  const [draggedIndex, setDraggedIndex] = useState(null)
+  const [leaveOpen, setLeaveOpen] = useState(false)
   const normalizedQuery = query.trim()
   const searchHasResult = searchState.query === normalizedQuery
   const results = searchHasResult ? searchState.results : []
   const searching = Boolean(normalizedQuery && (!searchHasResult || searchState.searching))
   const searchError = searchHasResult ? searchState.error : ''
-
+  const [inviteOpen, setInviteOpen] = useState(false)
   useEffect(() => {
     if (!normalizedQuery) return undefined
     const controller = new AbortController()
@@ -54,17 +57,16 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
     queue.splice(to, 0, track)
     return { ...state, queue, current: queue.findIndex((item) => item.id === currentId) }
   })
-  const dropTrack = (event, index) => {
-    event.preventDefault()
-    const from = Number(event.dataTransfer.getData('text/plain'))
-    if (Number.isInteger(from)) moveTrack(from, index)
-    setDraggedIndex(null)
-  }
+  
+  const queueDrag = useDragReorder(moveTrack)
+    
   const removeTrack = (index) => updateRoom((state) => {
-    const queue = state.queue.filter((_, itemIndex) => itemIndex !== index)
-    const current = queue.length ? Math.min(state.current > index ? state.current - 1 : state.current, queue.length - 1) : 0
-    return { ...state, queue, current, playing: queue.length ? state.playing : false }
-  })
+  const queue = state.queue.filter((_, itemIndex) => itemIndex !== index)
+  const current = queue.length ? Math.min(state.current > index ? state.current - 1 : state.current, queue.length - 1) : 0
+  return { ...state, queue, current, playing: queue.length ? state.playing : false }
+})
+
+
   const shareCode = async () => {
     try { await navigator.clipboard.writeText(roomCode); setCopied(true); setTimeout(() => setCopied(false), 1600) }
     catch { setFeedback(`Copy this room code to share it: ${roomCode}`) }
@@ -88,11 +90,16 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
 
   return <main className="page room">
     <div className="room-bar">
-      <button className="btn btn-text" onClick={onLeave}><X size={15} /> Leave</button>
+      <button className="btn btn-small btn-leave" onClick={() => setLeaveOpen(true)}><LogOut size={15} /> Leave</button>
+      <button className="btn btn-small btn-leave" onClick={() => setInviteOpen(true)}><UserPlus size={15} /> Invite</button>
       <div className="room-meta">
+                
         <span className={`dot dot-${connection}`} aria-hidden="true" />
+        
         <span>{status} · {members} {members === 1 ? 'listener' : 'listeners'}</span>
+        
         <button className="chip" onClick={shareCode} title="Copy room code">{copied ? <><Check size={13} /> Copied</> : roomCode}</button>
+        
       </div>
     </div>
 
@@ -129,17 +136,14 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
       </div>
       {room.queue.length === 0
         ? <p className="empty">Songs you add will show up here.</p>
-        : <ul className="track-list queue-list">
+                : <ul ref={queueDrag.listRef} className="track-list queue-list">
             {room.queue.map((track, index) => <li
-              className={`track queue-track ${index === room.current ? 'active' : ''}${draggedIndex === index ? ' dragging' : ''}`}
-              key={`${track.id}-${index}`}
-              draggable
-              onDragStart={(event) => { setDraggedIndex(index); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', String(index)) }}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => dropTrack(event, index)}
-              onDragEnd={() => setDraggedIndex(null)}
+              className={`track queue-track ${index === room.current ? 'active' : ''}${queueDrag.dragIndex === index ? ' dragging' : ''}`}
+              key={track.id}
+              style={queueDrag.itemStyle(index)}
             >
-              <span className="queue-drag-handle" aria-hidden="true" title="Drag to reorder"><GripVertical size={17} /></span>
+              <span className="queue-drag-handle" {...queueDrag.handleProps(index)} title="Drag to reorder" aria-label={`Drag ${track.title} to reorder`}><GripVertical size={17} /></span>
+             
               <button className="track-play" onClick={() => onPlayTrack(track)} aria-label={`Play ${track.title}`}><Play size={12} /></button>
               <img src={track.thumbnail} alt="" />
               <button className="track-text as-button" onClick={() => onPlayTrack(track)}><strong>{track.title}</strong><small>{track.artist}</small></button>
@@ -165,7 +169,17 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
         <button className="btn btn-primary btn-block" type="submit" disabled={savingQueue || !playlistName.trim()}>{savingQueue ? 'Saving…' : 'Save playlist'}</button>
       </form>
     </div>}
+        {inviteOpen && <InviteFriendsModal roomCode={roomCode} onClose={() => setInviteOpen(false)} />}
     <FeedbackModal title="Something went wrong" message={feedback} onClose={() => setFeedback('')} />
+          {leaveOpen && <ConfirmModal
+      title="Are you sure you want to leave?"
+      message={`You're about to leave room ${roomCode}. You can rejoin any time with the room code.`}
+      confirmLabel="Leave room"
+      icon={LogOut}
+      danger={false}
+      onCancel={() => setLeaveOpen(false)}
+      onConfirm={() => { setLeaveOpen(false); onLeave() }}
+    />}
   </main>
 }
 

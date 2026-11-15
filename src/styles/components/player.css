@@ -143,3 +143,22 @@
 
 .np-icon.has-timer { position: relative; }
 .np-icon.has-timer::after { content: ""; position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border-radius: 50%; background: #e0343f; box-shadow: 0 0 0 2px #11171a; }
+
+/* ── Fit: art shrinks to leave room for lyrics + controls ── */
+.np-card { --np-h: min(calc(100dvh - 24px), 780px); }
+@media (max-width: 480px) { .np-card { --np-h: 100dvh; } }
+.np-body { overflow: hidden; touch-action: pan-y; }
+.np-body:not(.no-lyrics) .np-stage:not(.is-lyrics) { width: min(100%, clamp(120px, calc(var(--np-h) - 450px), 42dvh)); }
+.np-lyric-window { height: 88px; }
+.np-controls { flex: 0 0 auto; gap: 6px; padding-top: 6px; }
+.np-controls > * { flex: none; }
+
+/* ── Swipe back from lyrics: the scrolling list must allow only vertical pan ── */
+.np-lyrics-list, .np-lyrics-note { touch-action: pan-y; }
+
+/* ── Lyrics button + queue drag ── */
+.np-card .icon-btn.active { background: rgba(255,255,255,.2); color: #fff; }
+.np-drag-handle { width: 26px; height: 36px; flex: 0 0 auto; display: grid; place-items: center; color: rgba(255,255,255,.45); cursor: grab; touch-action: none; user-select: none; }
+.np-drag-handle:active { cursor: grabbing; }
+.np-queue-list li.dragging { background: rgba(255,255,255,.18); box-shadow: 0 8px 24px rgba(0,0,0,.45); }
+

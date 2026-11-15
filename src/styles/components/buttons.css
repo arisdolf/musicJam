@@ -23,3 +23,5 @@ button:active:not(:disabled) { transform: scale(.95); transition-duration: 60ms;
 .save-track-btn.is-saved { color: var(--danger); }
 .motion-icon { display: grid; place-items: center; animation: pop-in 220ms var(--spring) backwards; }
 .motion-success { animation: pulse 420ms var(--ease-out) backwards; }
+.btn-leave { background: var(--surface); border-color: var(--line); color: var(--ink); }
+.btn-leave:hover:not(:disabled) { background: var(--bg); border-color: var(--muted); }

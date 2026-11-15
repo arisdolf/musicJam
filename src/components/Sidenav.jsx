@@ -1,19 +1,20 @@
 // src/components/Sidenav.jsx
 import { useEffect } from 'react'
 import { useAccount } from '../features/account/AccountContext'
-import { Music2, Home, ListMusic, Gauge, History, Settings, LogIn, UserPlus, X, LogOut } from 'lucide-react'
-
+import { Music2, Home, ListMusic, Gauge, History, Settings, LogIn, UserPlus, X, LogOut, Users } from 'lucide-react'
+import { useFriends } from '../features/friends/FriendsContext'
 const NAV = [
   { id: 'home',     label: 'Home',         icon: Home },
   { id: 'quota', label: 'API Quota', icon: Gauge },
   { id: 'playlists',label: 'Playlists',    icon: ListMusic, authOnly: true },
+    { id: 'friends',   label: 'Friends',      icon: Users,     authOnly: true },
   { id: 'recent',   label: 'Recent Rooms', icon: History },
   { id: 'settings', label: 'Settings',     icon: Settings,  authOnly: true },
 ]
 
 export default function Sidenav({ view, onNavigate, open, onClose }) {
   const { user, openAuth, logOut } = useAccount()
-
+  const { pendingCount } = useFriends()
   // Close on ESC
   useEffect(() => {
     if (!open) return
@@ -23,7 +24,7 @@ export default function Sidenav({ view, onNavigate, open, onClose }) {
   }, [open, onClose])
 
   const go = (id) => { onNavigate(id); onClose() }
-
+  
   const visibleNav = NAV.filter(n => !n.authOnly || user)
 
   return (
@@ -49,7 +50,8 @@ export default function Sidenav({ view, onNavigate, open, onClose }) {
               >
                 <Icon size={19} />
                 <span>{label}</span>
-              </button>
+{id === 'friends' && pendingCount > 0 && <span className="nav-badge">{pendingCount}</span>}
+</button>
             </li>
           ))}
         </ul>

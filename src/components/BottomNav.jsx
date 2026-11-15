@@ -1,6 +1,7 @@
 // src/components/BottomNav.jsx  — mobile-only bottom navigation bar
-import { Home, ListMusic, Gauge, History, Settings } from 'lucide-react'
+import { Home, ListMusic, Gauge, History, Settings, Users } from 'lucide-react'
 import { useAccount } from '../features/account/AccountContext'
+import { useFriends } from '../features/friends/FriendsContext'
 
 const NAV_GUEST = [
   { id: 'home',    label: 'Home',    icon: Home },
@@ -10,13 +11,16 @@ const NAV_GUEST = [
 const NAV_AUTH = [
   { id: 'home',      label: 'Home',      icon: Home },
   { id: 'playlists', label: 'Playlists', icon: ListMusic },
+    { id: 'friends',   label: 'Friends',   icon: Users },
   { id: 'quota',     label: 'Quota',     icon: Gauge },
   { id: 'recent',    label: 'Rooms',     icon: History },
   { id: 'settings',  label: 'Settings',  icon: Settings },
 ]
 
 export default function BottomNav({ view, onNavigate }) {
+  
   const { user } = useAccount()
+  const { pendingCount } = useFriends()
   const items = user ? NAV_AUTH : NAV_GUEST
 
   return (
@@ -29,6 +33,7 @@ export default function BottomNav({ view, onNavigate }) {
         >
           <Icon size={22} />
           <span>{label}</span>
+           {id === 'friends' && pendingCount > 0 && <span className="nav-badge">{pendingCount}</span>}
         </button>
       ))}
     </nav>

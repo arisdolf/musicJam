@@ -1,4 +1,7 @@
-import { useState, useCallback, useMemo, useRef } from 'react'
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
+import { FriendsProvider } from './features/friends/FriendsContext'
+import Friends from './pages/Friends'
+import InviteToasts from './components/InviteToasts'
 import { AccountProvider } from './features/account/AccountContext'
 import { PlaybackProvider, usePlayback } from './features/playback/PlaybackContext'
 import { useRoom } from './features/rooms/useRoom'
@@ -16,7 +19,7 @@ import PersistentPlayer from './components/PersistentPlayer'
 import QueueFly from './components/QueueFly'
 import { useAccount } from './features/account/AccountContext'
 import ErrorBoundary from './components/ErrorBoundary'
-
+import { playNow } from './utils/queue'
 // ── Inner shell (needs AccountContext) ────────────────────────────────────────
 function Shell() {
   const { user } = useAccount()
@@ -50,6 +53,23 @@ function Shell() {
     setView('home')
     setUrlRoom(code)
   }, [setUrlRoom])
+
+    // Clicking a system notification: join the invited room, or open Friends.
+  useEffect(() => {
+    const open = (detail) => {
+      if (detail?.roomCode) joinRoom(detail.roomCode)
+      else setView('friends')
+    }
+    const onWindow = (event) => open(event.detail)
+    const onWorker = (event) => { if (event.data?.type === 'jamroom:notification') open(event.data.data) }
+    window.addEventListener('jamroom:notification', onWindow)
+    navigator.serviceWorker?.addEventListener('message', onWorker)
+    return () => {
+      window.removeEventListener('jamroom:notification', onWindow)
+      navigator.serviceWorker?.removeEventListener('message', onWorker)
+    }
+  }, [joinRoom])
+
 
   const leaveRoom = useCallback(() => {
     if (!roomQueue.length) {
@@ -103,17 +123,10 @@ function Shell() {
     setQueueFly((current) => current?.key === key ? null : current)
   }, [])
 
-  const playTrack = useCallback((track) => {
+   const playTrack = useCallback((track) => {
     if (!track?.id) return
-    if (!roomCode) {
-      playLocalTrack(track)
-      return
-    }
-    updateRoom((state) => {
-      const existingIndex = state.queue.findIndex((item) => item.id === track.id)
-      const queue = existingIndex >= 0 ? state.queue : [...state.queue, track]
-      return { ...state, queue, current: existingIndex >= 0 ? existingIndex : queue.length - 1, playing: true }
-    })
+    if (!roomCode) { playLocalTrack(track); return }
+    updateRoom((state) => playNow(state, [track]))
     startVideo(track.id)
   }, [roomCode, updateRoom, playLocalTrack, startVideo])
 
@@ -143,20 +156,10 @@ function Shell() {
   }, [roomCode, updateRoom, addLocalTrack, animateQueueAdd])
 
   const playTracks = useCallback((tracks, index = 0) => {
-    if (!roomCode) {
-      playLocalTracks(tracks, index)
-      return
-    }
-    const track = tracks[index]
-    if (!track) return
-    updateRoom((state) => {
-      const queue = [...state.queue]
-      for (const item of tracks) {
-        if (!queue.some((existing) => existing.id === item.id)) queue.push(item)
-      }
-      return { ...state, queue, current: queue.findIndex((item) => item.id === track.id), playing: true }
-    })
-    startVideo(track.id)
+    if (!roomCode) { playLocalTracks(tracks, index); return }
+    if (!tracks[index]?.id) return
+    updateRoom((state) => playNow(state, tracks, index))
+    startVideo(tracks[index].id)
   }, [roomCode, updateRoom, playLocalTracks, startVideo])
 
   const renderContent = () => {
@@ -167,6 +170,7 @@ function Shell() {
       case 'playlists': return <Playlists onBrowse={() => navigate('home')} onPlayTracks={playTracks} onQueueTrack={queueTrack} />
       case 'quota':     return <Quota />
       case 'recent':    return <RecentRooms onJoin={joinRoom} />
+       case 'friends':   return <Friends roomCode={roomCode} />
       case 'settings':  return user ? <Settings /> : null
       default:          return <JoinRoom onJoin={joinRoom} />
     }
@@ -199,12 +203,13 @@ function Shell() {
         </div>
         <BottomNav view={view} onNavigate={navigate} />
       </div>
-
+            <InviteToasts onJoin={joinRoom} onOpenFriends={() => navigate('friends')} />
+    
       <AuthModal />
     </div>
   )
 }
 
 export default function App() {
-  return <AccountProvider><PlaybackProvider><Shell /></PlaybackProvider></AccountProvider>
+  return <AccountProvider><FriendsProvider><PlaybackProvider><Shell /></PlaybackProvider></FriendsProvider></AccountProvider>
 }

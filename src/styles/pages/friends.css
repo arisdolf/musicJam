@@ -1,0 +1,23 @@
+/* Friends page, invite toasts, nav badge. */
+.friends-page { width: min(100%, 560px); margin: 0 auto; padding: 28px 16px 64px; }
+.friends-me { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.friends-notice { margin: 0 0 12px; }
+.friends-section { margin-top: 26px; }
+.friends-section h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 15px; }
+.friends-section h2 small { font-weight: 400; }
+.friends-list { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.friends-list .track { padding: 10px 12px; }
+.friends-hint { margin: 10px 2px 0; font-size: 13px; }
+.modal .friends-list { margin-bottom: 4px; max-height: 50dvh; overflow-y: auto; }
+@media (max-width: 480px) { .friends-page { padding: 20px 12px 48px; } }
+
+.invite-stack { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 12px); left: 50%; z-index: 230; width: min(420px, calc(100vw - 24px)); display: grid; gap: 8px; transform: translateX(-50%); }
+.invite-toast { display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 12px; border: 1px solid var(--line); border-radius: 16px; background: var(--bg); box-shadow: var(--shadow-pop); animation: enter 320ms var(--ease-out) backwards; }
+.invite-toast-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.invite-toast-text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.invite-toast-text small { color: var(--muted); font-size: 12px; }
+
+.nav-badge { min-width: 18px; height: 18px; padding: 0 5px; display: grid; place-items: center; border-radius: 999px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; }
+.sidenav-item .nav-badge { margin-left: auto; }
+.bottom-nav-item { position: relative; }
+.bottom-nav-item .nav-badge { position: absolute; top: 2px; left: calc(50% + 6px); }

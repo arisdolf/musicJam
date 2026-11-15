@@ -1,8 +1,8 @@
 // src/pages/Settings.jsx
 import { useState } from 'react'
-
+import UsernameForm from '../components/UsernameForm'
 import { useAccount } from '../features/account/AccountContext'
-import { User, Lock, LogOut, Trash2, Check, Monitor } from 'lucide-react'
+import { User, Lock, LogOut, Trash2, Check, Monitor, AtSign } from 'lucide-react'
 
 // ADJUST these to match the routes in your server's auth file.
 
@@ -65,6 +65,11 @@ export default function Settings() {
         <div className="appearance-status"><span className="appearance-status-dot" /> Following device settings</div>
       </section>
 
+            <section className="settings-card">
+        <div className="settings-card-header"><AtSign size={18} /><h2>Username</h2></div>
+        <UsernameForm />
+      </section>
+      
       {/* ── Profile ── */}
       <section className="settings-card">
         <div className="settings-card-header"><User size={18} /><h2>Profile</h2></div>
