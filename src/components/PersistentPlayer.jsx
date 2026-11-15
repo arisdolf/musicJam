@@ -11,6 +11,20 @@ import {
   Pause, Play, Plus, Repeat1, Search, Settings, Shuffle, SkipBack, SkipForward, Timer, TimerOff, Trash2,
 } from 'lucide-react'
 
+// 1 second of silence. Looping it keeps the phone treating this page as "playing media".
+function makeSilentWav(seconds = 1, rate = 8000) {
+  const samples = seconds * rate
+  const buffer = new ArrayBuffer(44 + samples)
+  const view = new DataView(buffer)
+  const write = (offset, text) => { for (let i = 0; i < text.length; i++) view.setUint8(offset + i, text.charCodeAt(i)) }
+  write(0, 'RIFF'); view.setUint32(4, 36 + samples, true); write(8, 'WAVE')
+  write(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true)
+  view.setUint32(24, rate, true); view.setUint32(28, rate, true); view.setUint16(32, 1, true); view.setUint16(34, 8, true)
+  write(36, 'data'); view.setUint32(40, samples, true)
+  new Uint8Array(buffer, 44).fill(128) // 8-bit silence
+  return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }))
+}
+
 const YOUTUBE_READY_EVENT = 'onYouTubeIframeAPIReady'
 const OFFSET_KEY = 'jamroom:lyric-offset:'
 const SHOW_LYRICS_KEY = 'jamroom:show-lyrics'
@@ -65,6 +79,8 @@ function readResume() {
 export default function PersistentPlayer({ playback, onPlaybackChange, onNavigate, onPlayTrack, onQueueTrack, sync }) {
   const { registerPlayer } = usePlayback()
   const { user, openAuth } = useAccount()
+  const keepAliveRef = useRef(null)
+const userPauseRef = useRef(0) // when the listener last paused on purpose
   const [playerReady, setPlayerReady] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [view, setView] = useState('player')        // 'player' | 'queue' | 'search'
@@ -281,7 +297,8 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
   }, [mode, playbackQueue.length, playbackCurrent])
 
   const changePlaying = useCallback((playing) => {
-    const track = playbackQueue[playbackCurrent]
+  if (!playing) userPauseRef.current = Date.now()
+  const track = playbackQueue[playbackCurrent]
     if (!track) return
     onPlaybackChange((state) => ({ ...state, playing }), { position: livePosition() })
     if (playing) requestVideo(track)
@@ -298,6 +315,7 @@ if (resumeRef.current === undefined) resumeRef.current = readResume()
 
   // If the browser blocked autoplay, the first click should actually start the video.
   const togglePlay = () => {
+  keepAliveRef.current?.play().catch(() => {})
     const state = playerRef.current?.getPlayerState?.()
     if (playbackPlaying && (state === -1 || state === 5) && currentTrack) {
       requestVideo(currentTrack, true)
@@ -413,8 +431,12 @@ if (resumeRef.current === undefined) resumeRef.current = readResume()
               latest.onPlaybackChange((state) => ({ ...state, playing: true }), { position: livePosition() })
             }
             if (event.data === 2 && latest.playback.playing && hasPlayedRef.current) {
-              latest.onPlaybackChange((state) => ({ ...state, playing: false }), { position: livePosition() })
-            }
+              if (document.visibilityState === 'hidden' && Date.now() - userPauseRef.current > 2000) {
+    try { event.target.playVideo() } catch { /* player not ready */ }
+    return
+  }
+  latest.onPlaybackChange((state) => ({ ...state, playing: false }), { position: livePosition() })
+}
             if (event.data === 0) {
               try { localStorage.removeItem(RESUME_KEY) } catch { /* storage is optional */ }
               
@@ -544,6 +566,52 @@ if (resumeRef.current === undefined) resumeRef.current = readResume()
     if (state !== 1 && state !== 2 && state !== 3) return // not started yet (autoplay blocked): starts at the right spot on first tap
     followRoom(player, currentTrackId)
   }, [sync, playerReady, currentTrackId, syncStamp, playbackPlaying, followRoom])
+
+  // Silent looping audio element, played whenever music is playing.
+useEffect(() => {
+  const audio = new Audio(makeSilentWav())
+  audio.loop = true
+  audio.setAttribute('playsinline', '')
+  keepAliveRef.current = audio
+  return () => { audio.pause(); URL.revokeObjectURL(audio.src); keepAliveRef.current = null }
+}, [])
+
+useEffect(() => {
+  const audio = keepAliveRef.current
+  if (!audio) return
+  if (playbackPlaying && currentTrackId) audio.play().catch(() => { /* needs a tap first */ })
+  else audio.pause()
+}, [playbackPlaying, currentTrackId])
+
+// Lock-screen / notification controls show the right play or pause state.
+useEffect(() => {
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = playbackPlaying ? 'playing' : 'paused'
+}, [playbackPlaying])
+
+// While the page is hidden, nudge the player back to playing if the phone paused it.
+useEffect(() => {
+  if (!playerReady || !playbackPlaying || !currentTrackId) return undefined
+  const timer = setInterval(() => {
+    if (document.visibilityState !== 'hidden') return
+    if (Date.now() - userPauseRef.current < 2000) return
+    const player = playerRef.current
+    const state = player?.getPlayerState?.()
+    if (state === 2 || state === 5 || state === -1) { try { player.playVideo() } catch { /* player not ready */ } }
+  }, 3000)
+  return () => clearInterval(timer)
+}, [playerReady, playbackPlaying, currentTrackId])
+
+// Coming back to the page: restart if it stopped while you were away.
+useEffect(() => {
+  const onVisible = () => {
+    if (document.visibilityState !== 'visible' || !playbackPlaying || !currentTrack) return
+    const state = playerRef.current?.getPlayerState?.()
+    if (state !== 1 && state !== 3) requestVideo(currentTrack, true)
+  }
+  document.addEventListener('visibilitychange', onVisible)
+  return () => document.removeEventListener('visibilitychange', onVisible)
+}, [playbackPlaying, currentTrack, requestVideo])
+
 
   // Room sync 2/2: while playing, quietly correct drift (buffering, background tabs) every few seconds.
   useEffect(() => {
