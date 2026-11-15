@@ -1,6 +1,6 @@
 import { useAccount } from '../features/account/AccountContext'
 import { useFriends } from '../features/friends/FriendsContext'
-import { Music2, Home, ListMusic, History, Settings, LogIn, UserPlus, LogOut } from 'lucide-react'
+import { Music2, Home, ListMusic, History, Settings } from 'lucide-react'
 
 const NAV = [
   { id: 'home',      label: 'Home',         icon: Home },
@@ -10,7 +10,7 @@ const NAV = [
 ]
 
 export default function Sidenav({ view, onNavigate }) {
-  const { user, openAuth, logOut } = useAccount()
+  const { user } = useAccount()
   const { pendingCount } = useFriends()
   const visibleNav = NAV.filter((n) => !n.authOnly || user)
 
@@ -33,20 +33,14 @@ export default function Sidenav({ view, onNavigate }) {
         ))}
       </ul>
 
-      <div className="sidenav-footer">
-        {user ? (
+      {user && (
+        <div className="sidenav-footer">
           <div className="sidenav-user">
             <div className="sidenav-avatar">{user.name.charAt(0).toUpperCase()}</div>
             <div className="sidenav-user-info"><strong>{user.name}</strong><small>{user.email}</small></div>
-            <button className="icon-btn" onClick={logOut} title="Sign out"><LogOut size={17} /></button>
           </div>
-        ) : (
-          <div className="sidenav-auth-btns">
-            <button className="btn btn-primary btn-block" onClick={() => openAuth('signup')}><UserPlus size={15} /> Sign up</button>
-            <button className="btn btn-block" onClick={() => openAuth('login')}><LogIn size={15} /> Log in</button>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </nav>
   )
 }

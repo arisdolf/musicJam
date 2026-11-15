@@ -10,6 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/cli": "^8.6.2",
+    "@capacitor/core": "^8.6.2",
     "dotenv": "^18.0.10",
     "firebase": "^13.3.0",
     "firebase-admin": "^14.5.1",

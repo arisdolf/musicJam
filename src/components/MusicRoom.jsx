@@ -6,7 +6,7 @@ import { useAccount } from '../features/account/AccountContext'
 import ConfirmModal from './ConfirmModal'
 import { useDragReorder } from '../hooks/useDragReorder'
 import InviteFriendsModal from './InviteFriendsModal'
-import { Play, Search, Music2, Check, X, Plus, GripVertical, ArrowUp, ArrowDown,  ListMusic, ListPlus, ChevronDown, LogOut, UserPlus, Sparkles } from 'lucide-react'
+import { Play, Search, Music2, Check, X, Plus, GripVertical, ListMusic, ListPlus, ChevronDown, LogOut, UserPlus, Sparkles } from 'lucide-react'
 
 export default function MusicRoom({ roomCode, room, updateRoom, connection, members, onLeave, onPlayTrack, onQueueTrack, onPlayTracks, onQueueTracks }) {
   const { user, openAuth, createPlaylist } = useAccount()
@@ -133,8 +133,8 @@ useEffect(() => {
   <button className="btn btn-small btn-primary" onClick={() => setInviteOpen(true)}><UserPlus size={15} /> Invite</button>
 </div>
 <div className="room-meta room-meta-row">
-  <span className={`dot dot-${connection}`} aria-hidden="true" />
-  <span>{status} · {members} {members === 1 ? 'listener' : 'listeners'}</span>
+  <span className={`dot dot-${connection}`} title={status} role="img" aria-label={status} />
+  <span>{members} {members === 1 ? 'listener' : 'listeners'}</span>
   <button className="chip" onClick={shareCode} title="Copy room code">{copied ? <><Check size={13} /> Copied</> : roomCode}</button>
 </div>
     <section className="block">
@@ -200,10 +200,7 @@ useEffect(() => {
               <button className="track-play" onClick={() => onPlayTrack(track)} aria-label={`Play ${track.title}`}><Play size={12} /></button>
               <img src={track.thumbnail} alt="" />
               <button className="track-text as-button" onClick={() => onPlayTrack(track)}><strong>{track.title}</strong><small>{track.artist}</small></button>
-              <span className="queue-reorder-controls">
-                <button className="queue-move-btn" onClick={() => moveTrack(index, index - 1)} disabled={index === 0} aria-label={`Move ${track.title} earlier`} title="Move earlier"><ArrowUp size={13} /></button>
-                <button className="queue-move-btn" onClick={() => moveTrack(index, index + 1)} disabled={index === room.queue.length - 1} aria-label={`Move ${track.title} later`} title="Move later"><ArrowDown size={13} /></button>
-              </span>
+      
               <AddToPlaylist track={track} />
               <button className="icon-btn" aria-label={`Remove ${track.title}`} onClick={() => removeTrack(index)}><X size={16} /></button>
             </li>)}

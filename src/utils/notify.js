@@ -10,7 +10,18 @@ export async function showSystemNotification({ title, body, roomCode, tag }) {
   try {
     const reg = await navigator.serviceWorker?.getRegistration()
     if (!reg) return false
-    await reg.showNotification(title, { body, tag, renotify: true, data: { roomCode } })
+    await reg.showNotification(title, {
+      body,
+      tag,
+      renotify: true,
+      icon: '/icon-192.png',   // big icon next to the text
+      badge: '/badge-72.png',  // small white icon in the Android status bar
+      vibrate: [120, 60, 120],
+      actions: roomCode
+        ? [{ action: 'join', title: 'Join room' }, { action: 'dismiss', title: 'Dismiss' }]
+        : [],
+      data: { roomCode },
+    })
     return true
   } catch { return false }
 }

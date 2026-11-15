@@ -118,7 +118,7 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
       while (!controller.signal.aborted && !stopReason) {
         const index = next++
         if (index >= songs.length) return
-        try { matched[index] = await matchSong(songs[index], controller.signal) }
+        try { matched[index] = await matchSong(songs[index], controller.signal, ) }
         catch (err) {
           if (err.name === 'AbortError') return
           if (QUOTA_REASONS.includes(err.reason) || /API key/i.test(err.message)) stopReason = err.message

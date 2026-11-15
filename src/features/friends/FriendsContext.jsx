@@ -16,10 +16,27 @@ const INVITE_TTL = 2 * 60 * 60 * 1000 // invites older than this are ignored and
 function alertUser(title, body, data) {
   if (!document.hidden && document.hasFocus()) return
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
-  const options = { body, tag: data.tag, renotify: true, data }
+
+  const base = {
+    body,
+    tag: data.tag,
+    renotify: true,
+    data,
+    icon: '/icon-192.png',
+    badge: '/badge-72.png',
+    vibrate: [120, 60, 120],
+  }
+  // Buttons only work through the service worker.
+  const withButtons = {
+    ...base,
+    actions: data.roomCode
+      ? [{ action: 'join', title: 'Join room' }, { action: 'dismiss', title: 'Dismiss' }]
+      : [],
+  }
+
   const fallback = () => {
     try {
-      const note = new Notification(title, options)
+      const note = new Notification(title, base) // no actions here, or the browser throws
       note.onclick = () => {
         window.focus()
         window.dispatchEvent(new CustomEvent('jamroom:notification', { detail: data }))
@@ -29,7 +46,7 @@ function alertUser(title, body, data) {
   }
   if (!navigator.serviceWorker) { fallback(); return }
   navigator.serviceWorker.getRegistration()
-    .then((reg) => (reg?.showNotification ? reg.showNotification(title, options) : fallback()))
+    .then((reg) => (reg?.showNotification ? reg.showNotification(title, withButtons) : fallback()))
     .catch(fallback)
 }
 

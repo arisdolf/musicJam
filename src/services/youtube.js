@@ -77,28 +77,45 @@ export function searchYouTube(query, signal) {
 }
 
 // ── Song vs. random video ─────────────────────────────────────────────────────
-// Hard no: things that are clearly not a song.
-const NOT_A_SONG = /\b(reaction|reacts?|reacting|review|tutorial|how to|lesson|karaoke|vlog|interview|behind the scenes|trailer|teaser|podcast|compilation|full album|shorts|dance practice|choreography|1 hour|2 hours|10 hours|nightcore|8d audio|asmr)\b/i
-// Soft penalty: usually not the studio version.
-const NOT_STUDIO = /\b(live|cover|slowed|sped up|reverb|concert|remix|acoustic version|instrumental)\b/i
-const IS_AUDIO = /\b(official audio|audio|lyrics?|lyric video|visuali[sz]er)\b/i
-const IS_VIDEO = /\b(official (music )?video|music video|m\/?v)\b/i
+// Hard no: anything that is not just the song.
+const NOT_A_SONG = /\b(reaction|reacts?|reacting|review|tutorial|how to|lesson|karaoke|vlog|interview|behind the scenes|making of|trailer|teaser|podcast|compilation|full album|shorts|dance practice|choreography|1 hour|2 hours|10 hours|nightcore|8d|asmr|cover|live|concert|performance|session|remix|slowed|sped up|reverb|mashup|medley|instrumental|acoustic|unplugged|fan ?made|skit|intro|outro|short film|film|episode|ep\.?\s?\d+|bts|teaser|snippet|preview|clip|dance version|piano version|tribute|loop|bass boosted|lyric prank)\b/i
+// What we accept: plain audio, lyric videos, or official music videos.
+const IS_AUDIO = /\b(official audio|audio|lyrics?|lyric video|lyrical|visuali[sz]er)\b/i
+const IS_MV = /\b(official (music )?video|music video|m\/?v)\b/i
 
-// Higher = more like a plain audio upload (e.g. "Artist - Topic" channels).
-// Returns null when the item should be dropped.
+// Returns null when the item should be dropped, otherwise a score (higher = plainer audio).
 function audioScore(item, seconds) {
   const title = item.snippet?.title || ''
   const channel = item.snippet?.channelTitle || ''
+  const isTopic = /\s-\s*topic$/i.test(channel)
+  const isVevo = /vevo$/i.test(channel)
+
   if (NOT_A_SONG.test(title)) return null
-  if (seconds < 60 || seconds > 720) return null
+  if (seconds < 90 || seconds > 480) return null // 1:30 to 8:00 keeps out intros/skits and long extras
+
+  const audio = IS_AUDIO.test(title)
+  const mv = IS_MV.test(title)
+  // Must be clearly one of the 3 accepted kinds.
+  if (!isTopic && !audio && !mv && !isVevo) return null
 
   let score = 0
-  if (/\s-\s*topic$/i.test(channel)) score += 5
-  if (IS_AUDIO.test(title)) score += 3
-  if (IS_VIDEO.test(title)) score -= 3
-  if (NOT_STUDIO.test(title)) score -= 2
+  if (isTopic) score += 6 // auto-generated "Artist - Topic" uploads are pure studio audio
+  if (audio) score += 4
+  if (mv) score += 1
+  if (isVevo) score += 1
   return score
 }
+
+// ── Popularity (Philippines + modern) ─────────────────────────────────────────
+// YouTube only gives us view count and upload year, so "popular" = enough views for its age.
+// New songs need fewer views because they have had less time to collect them; old songs must be real hits.
+const THIS_YEAR = new Date().getFullYear()
+function isPopular(track, strictness = 1) {
+  const age = THIS_YEAR - (track.year || THIS_YEAR)
+  const base = age <= 2 ? 300_000 : age <= 6 ? 1_000_000 : 5_000_000
+  return (track.views || 0) >= base * strictness
+}
+
 
 // ── Core search ───────────────────────────────────────────────────────────────
 function searchMusic(query, { signal, limit, order }) {
@@ -123,6 +140,7 @@ function searchMusic(query, { signal, limit, order }) {
       const track = toTrack(item)
       const score = audioScore(item, track.duration)
       if (score === null) return
+      if (!isPopular(track)) return
       scored.push({ track, score, index })
     })
 
@@ -217,6 +235,7 @@ function toTrack(item) {
     thumbnail: snippet.thumbnails?.medium?.url || `https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`,
     duration: parseDuration(contentDetails?.duration),
     views: Number(statistics?.viewCount || 0),
+    year: Number((snippet.publishedAt || '').slice(0, 4)) || 0,
   }
 }
 
@@ -264,6 +283,7 @@ export async function matchSong({ title, artist, duration }, signal) {
     const item = byId.get(id)
     if (!item || !isPlayable(item, REGION)) return
     const track = toTrack(item)
+    if (audioScore(item, track.duration) === null) return 
     const haystack = track.title.toLowerCase()
     const titleHits = wanted.filter((word) => haystack.includes(word)).length
     let score = (wanted.length ? titleHits / wanted.length : 0) * 3 - index * 0.3
@@ -293,16 +313,44 @@ const GENRES = [
   [/\bindie\b/i, 'indie'], [/\bballad\b/i, 'ballad'], [/\b(edm|electronic)\b/i, 'EDM'], [/\bpop\b/i, 'pop'],
 ]
 
-const MIN_VIEWS = 1_000_000        // strict: songs that are actually known
-const RELAXED_VIEWS = 200_000      // fallback if the strict list is too short
+
 const BAD_VERSION = /\b(live|cover|remix|slowed|sped up|reverb|karaoke|instrumental|acoustic version|nightcore|8d|mashup|medley|tribute|loop)\b/i
 const FOREIGN_SCRIPT = /[\u0400-\u04FF\u0590-\u06FF\u0900-\u0DFF\u0E00-\u0E7F\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]/
 
 const pick = (list, text) => list.find(([pattern]) => pattern.test(text))?.[1] || ''
 const titleKey = (title) => title.toLowerCase().replace(/[^a-z0-9]/g, '')
 
+// Top music in the Philippines right now. Costs 1 unit per page, so it is almost free.
+function phChart(signal) {
+  return cached('chart|PH', async () => {
+    try {
+      const tracks = []
+      let pageToken = ''
+      for (let page = 0; page < 2; page++) {
+        const data = await yt('videos', {
+          part: 'snippet,status,contentDetails,statistics',
+          chart: 'mostPopular', videoCategoryId: '10', regionCode: REGION, maxResults: '50',
+          ...(pageToken ? { pageToken } : {}),
+        }, signal)
+        for (const item of data.items || []) {
+          if (!isPlayable(item, REGION)) continue
+          const track = toTrack(item)
+          if (audioScore(item, track.duration) === null) continue
+          tracks.push(track)
+        }
+        pageToken = data.nextPageToken || ''
+        if (!pageToken) break
+      }
+      return tracks
+    } catch (error) {
+      if (error.name === 'AbortError') throw error
+      return [] // chart is a bonus; recommendations still work without it
+    }
+  })
+}
+
 export function getSimilarTracks(seed, signal) {
-  return cached(`similar2|${seed.id}`, async () => {
+  return cached(`similar3|${seed.id}`, async () => {
     let text = `${seed.title} ${seed.artist}`
     try {
       const data = await yt('videos', { part: 'snippet', id: seed.id }, signal)
@@ -313,41 +361,52 @@ export function getSimilarTracks(seed, signal) {
     const lang = pick(LANGUAGES, text)
     const mood = pick(MOODS, text)
     const genre = pick(GENRES, text)
-    const vibe = [mood, genre].filter(Boolean).join(' ')
     const allowForeign = lang === 'K-pop' || lang === 'J-pop' || FOREIGN_SCRIPT.test(`${seed.title} ${seed.artist}`)
 
-    // "hits" / "best" nudges YouTube toward famous songs instead of random uploads.
-    const mainQuery = lang || mood
+    const vibeQuery = lang || mood
       ? `${[lang, mood, genre].filter(Boolean).join(' ')} hits`
-      : `${seed.artist} ${genre} best songs`.replace(/\s+/g, ' ')
-    const mixQuery = lang ? `popular english ${vibe || 'pop'} hits` : `songs like ${seed.artist} hits`
+      : `${genre || 'pop'} hits philippines`
 
-    const [main, mix] = await Promise.all([
-      searchMusic(mainQuery, { signal, limit: 50, order: 'relevance' }),
-      searchMusic(mixQuery, { signal, limit: 30, order: 'relevance' }),
+    const [byArtist, byVibe, chart] = await Promise.all([
+      searchMusic(`${seed.artist} songs`, { signal, limit: 50, order: 'relevance' }),
+      searchMusic(vibeQuery, { signal, limit: 50, order: 'relevance' }),
+      phChart(signal),
     ])
 
+    const byViews = (list) => [...list].sort((a, b) => (b.views || 0) - (a.views || 0))
     const out = []
     const seen = new Set([seed.id, titleKey(seed.title)])
-    const good = (track, minViews, foreignOk) =>
-      (track.views || 0) >= minViews
+    const sameArtist = (track) => track.artist.toLowerCase() === seed.artist.toLowerCase()
+    const good = (track, strictness) =>
+      isPopular(track, strictness)
       && !BAD_VERSION.test(track.title)
-      && (foreignOk || !FOREIGN_SCRIPT.test(`${track.title} ${track.artist}`))
+      && (allowForeign || !FOREIGN_SCRIPT.test(`${track.title} ${track.artist}`))
     const push = (track) => {
-      if (seen.has(track.id) || seen.has(titleKey(track.title))) return
+      if (seen.has(track.id) || seen.has(titleKey(track.title))) return false
       seen.add(track.id); seen.add(titleKey(track.title)); out.push(track)
+      return true
     }
 
-    // Pass 1: very well-known songs only. Pass 2 relaxes the view count only if we are short of 25.
-    for (const minViews of [MIN_VIEWS, RELAXED_VIEWS]) {
-      if (out.length >= 25) break
-      const a = main.filter((t) => good(t, minViews, allowForeign))
-      const b = mix.filter((t) => good(t, minViews, false)) // the English mix never includes foreign scripts
-      let i = 0, j = 0
-      // About 3 from the main vibe, then 1 from the English mix.
-      while (out.length < 25 && (i < a.length || j < b.length)) {
-        for (let k = 0; k < 3 && i < a.length && out.length < 25; k++) push(a[i++])
-        if (j < b.length && out.length < 25) push(b[j++])
+    // Pass 1 wants very popular songs. Pass 2 relaxes only if we are short of 12.
+    for (const strictness of [2, 1]) {
+      if (out.length >= 12) break
+      // [source, max songs from it]; the vibe source appears twice so it fills the most slots.
+      const sources = [
+        { list: byViews(byArtist).filter((t) => sameArtist(t) && good(t, strictness)), cap: 8, taken: 0 },
+        { list: byViews(byVibe).filter((t) => good(t, strictness)), cap: 12, taken: 0 },
+        { list: byViews(chart).filter((t) => good(t, strictness)), cap: 8, taken: 0 },
+        { list: byViews(byVibe).filter((t) => good(t, strictness)), cap: 12, taken: 0 },
+      ]
+      let progress = true
+      while (out.length < 25 && progress) {
+        progress = false
+        for (const source of sources) {
+          if (out.length >= 25 || source.taken >= source.cap) continue
+          while (source.list.length) {
+            const track = source.list.shift()
+            if (push(track)) { source.taken++; progress = true; break }
+          }
+        }
       }
     }
     return out

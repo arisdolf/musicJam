@@ -162,3 +162,4 @@
 .np-drag-handle:active { cursor: grabbing; }
 .np-queue-list li.dragging { background: rgba(255,255,255,.18); box-shadow: 0 8px 24px rgba(0,0,0,.45); }
 
+.mini-player { touch-action: pan-y; user-select: none; -webkit-user-select: none; }

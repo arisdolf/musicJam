@@ -233,6 +233,70 @@ const userPauseRef = useRef(0) // when the listener last paused on purpose
     window.addEventListener('pointercancel', end)
   }
 
+  // Swipe the mini player: left = next song, right = previous song (like Spotify).
+const miniRef = useRef(null)
+const swipedRef = useRef(false)
+const startMiniSwipe = (event) => {
+  if (event.pointerType === 'mouse' && event.button !== 0) return
+  if (event.target.closest?.('.mini-play, .icon-btn')) return // let the buttons work normally
+  const bar = miniRef.current
+  if (!bar) return
+  const startX = event.clientX
+  const startY = event.clientY
+  let dragging = false
+  
+  let dx = 0
+  const canGo = (delta) => delta < 0 ? canNext : canPrev
+
+  const move = (e) => {
+    dx = e.clientX - startX
+    if (!dragging) {
+      if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(e.clientY - startY)) return
+      dragging = true
+      swipedRef.current = true 
+    }
+    const pull = canGo(dx) ? dx : dx * 0.25 // rubber band if there is no song that way
+    bar.style.transition = 'none'
+    bar.style.transform = `translateX(${pull}px)`
+    bar.style.opacity = String(1 - Math.min(Math.abs(pull) / 260, 0.5))
+  }
+  const end = () => {
+    window.removeEventListener('pointermove', move)
+    window.removeEventListener('pointerup', end)
+    window.removeEventListener('pointercancel', end)
+    setTimeout(() => { swipedRef.current = false }, 50)
+    if (!dragging) return
+    const reset = () => { bar.style.transition = ''; bar.style.transform = ''; bar.style.opacity = '' }
+    if (Math.abs(dx) >= SWIPE_MIN && canGo(dx)) {
+      const next = dx < 0
+      bar.style.transition = 'transform 140ms var(--ease-in-out), opacity 140ms var(--ease-in-out)'
+      bar.style.transform = `translateX(${next ? -90 : 90}px)`
+      bar.style.opacity = '0'
+      setTimeout(() => {
+        playIndex(next ? nextIndex() : playbackCurrent - 1)
+        // come back in from the opposite side
+        bar.style.transition = 'none'
+        bar.style.transform = `translateX(${next ? 90 : -90}px)`
+        requestAnimationFrame(() => {
+          bar.style.transition = 'transform 220ms var(--ease-out), opacity 220ms var(--ease-out)'
+          bar.style.transform = ''
+          bar.style.opacity = ''
+          setTimeout(reset, 240)
+        })
+      }, 140)
+    } else {
+      bar.style.transition = 'transform 260ms var(--ease-in-out), opacity 260ms var(--ease-in-out)'
+      bar.style.transform = ''
+      bar.style.opacity = ''
+      setTimeout(reset, 270)
+    }
+  }
+  window.addEventListener('pointermove', move)
+  window.addEventListener('pointerup', end)
+  window.addEventListener('pointercancel', end)
+}
+
+
   // ── Room sync helpers ──────────────────────────────────────────────────────
   // The real playhead, or undefined if the player has not started (so we never broadcast a fake 0:00).
   const livePosition = useCallback(() => {
@@ -685,30 +749,65 @@ useEffect(() => {
     list.scrollTo({ top: line.offsetTop - list.clientHeight / 2 + line.offsetHeight / 2, behavior: 'smooth' })
   }, [activeLyricIndex, lyricsOpen])
 
-  useEffect(() => {
-    if (!currentTrackId || !('mediaSession' in navigator)) return undefined
-    if ('MediaMetadata' in window) {
-      navigator.mediaSession.metadata = new window.MediaMetadata({
-        title: currentTrackTitle,
-        artist: currentTrackArtist,
-        artwork: currentTrackThumbnail ? [{ src: currentTrackThumbnail, sizes: '320x180', type: 'image/jpeg' }] : [],
-      })
+useEffect(() => {
+  if (!currentTrackId || !('mediaSession' in navigator)) return undefined
+  if ('MediaMetadata' in window) {
+    navigator.mediaSession.metadata = new window.MediaMetadata({
+      title: currentTrackTitle,
+      artist: currentTrackArtist,
+      album: 'Jamroom', // shown under the artist on some phones
+      artwork: [
+        { src: `https://i.ytimg.com/vi/${currentTrackId}/mqdefault.jpg`, sizes: '320x180', type: 'image/jpeg' },
+        { src: `https://i.ytimg.com/vi/${currentTrackId}/hqdefault.jpg`, sizes: '480x360', type: 'image/jpeg' },
+      ],
+    })
+  }
+  const jump = (seconds) => {
+    const player = playerRef.current
+    const time = Math.max(0, Number(player?.getCurrentTime?.() || 0) + seconds)
+    try { player?.seekTo?.(time, true) } catch { /* player not ready */ }
+    seekRoom(time)
+  }
+  const actions = {
+    play: () => changePlaying(true),
+    pause: () => changePlaying(false),
+    previoustrack: () => playIndex(playbackCurrent - 1),
+    nexttrack: () => playIndex(nextIndex()),
+    seekbackward: () => jump(-10),
+    seekforward: () => jump(10),
+    seekto: (details) => {
+      try { playerRef.current?.seekTo?.(details.seekTime, true) } catch { /* player not ready */ }
+      seekRoom(details.seekTime)
+    },
+  }
+  for (const [action, handler] of Object.entries(actions)) {
+    try { navigator.mediaSession.setActionHandler(action, handler) } catch { /* unsupported action */ }
+  }
+  return () => {
+    for (const action of Object.keys(actions)) {
+      try { navigator.mediaSession.setActionHandler(action, null) } catch { /* noop */ }
     }
-    const actions = {
-      play: () => changePlaying(true),
-      pause: () => changePlaying(false),
-      previoustrack: () => playIndex(playbackCurrent - 1),
-      nexttrack: () => playIndex(nextIndex()),
-    }
-    for (const [action, handler] of Object.entries(actions)) {
-      try { navigator.mediaSession.setActionHandler(action, handler) } catch { /* unsupported action */ }
-    }
-    return () => {
-      for (const action of Object.keys(actions)) {
-        try { navigator.mediaSession.setActionHandler(action, null) } catch { /* noop */ }
-      }
-    }
-  }, [currentTrackId, currentTrackTitle, currentTrackArtist, currentTrackThumbnail, playbackCurrent, changePlaying, playIndex, nextIndex])
+  }
+}, [currentTrackId, currentTrackTitle, currentTrackArtist, playbackCurrent, changePlaying, playIndex, nextIndex, seekRoom])
+
+
+// Keeps the lock-screen progress bar in step with the song.
+useEffect(() => {
+  if (!playerReady || !currentTrackId || !('mediaSession' in navigator) || !navigator.mediaSession.setPositionState) return undefined
+  const update = () => {
+    const player = playerRef.current
+    const duration = Number(player?.getDuration?.())
+    const position = Number(player?.getCurrentTime?.())
+    if (!Number.isFinite(duration) || duration <= 0 || !Number.isFinite(position)) return
+    try {
+      navigator.mediaSession.setPositionState({ duration, position: Math.min(position, duration), playbackRate: 1 })
+    } catch { /* not supported */ }
+  }
+  update()
+  const timer = setInterval(update, 3000)
+  return () => clearInterval(timer)
+}, [playerReady, currentTrackId, playbackPlaying])
+
 
   const offsetLabel = `${lyricOffset > 0 ? '+' : ''}${lyricOffset.toFixed(1)}s`
   const lineAt = (index) => (index >= 0 && index < lyricLines.length ? lyricLines[index].text || '♪' : '')
@@ -726,8 +825,8 @@ useEffect(() => {
     {/* The video lives here, off-screen. Only its audio is used. */}
     <div className="yt-host" ref={playerHostRef} aria-hidden="true" />
 
-    {currentTrack && !fullOpen && <div className="mini-player" role="region" aria-label="Music player">
-      <button className="mini-open" onClick={() => setExpanded(true)} aria-label={`Open player. Now playing ${currentTrack.title}`}>
+    {currentTrack && !fullOpen && <div className="mini-player" ref={miniRef} onPointerDown={startMiniSwipe} role="region" aria-label="Music player">
+      <button className="mini-open" onClick={() => { if (!swipedRef.current) setExpanded(true) }} aria-label={`Open player. Now playing ${currentTrack.title}`}>
         <img src={art} alt="" />
         <span className="mini-copy">
           <strong title={currentTrack.title}>{currentTrack.title}</strong>

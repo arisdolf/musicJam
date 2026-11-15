@@ -34,11 +34,11 @@
 .queue-track { transition: background var(--dur-fast), opacity var(--dur-fast); }
 .queue-track.dragging { background: var(--bg); border-radius: var(--radius); border-bottom-color: transparent; box-shadow: var(--shadow-pop); }
 .queue-drag-handle { width: 24px; height: 36px; display: grid; place-items: center; color: var(--muted); cursor: grab; touch-action: none; user-select: none; }
-.queue-reorder-controls { display: flex; flex-direction: column; gap: 1px; }
-.queue-move-btn { width: 24px; height: 19px; padding: 0; border: 0; border-radius: 5px; display: grid; place-items: center; background: transparent; color: var(--muted); }
+
+
 .queue-move-btn:hover:not(:disabled) { color: var(--accent-dark); background: var(--accent-soft); }
 .queue-move-btn:disabled { opacity: .3; cursor: not-allowed; }
 @media (max-width: 480px) {
   .track img { width: 44px; height: 32px; }
-  .queue-move-btn { width: 22px; }
+  
 }
