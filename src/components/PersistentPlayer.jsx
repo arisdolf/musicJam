@@ -6,6 +6,7 @@ import { rubberBandAtBounds } from '../utils/motion'
 import AddToPlaylist from './AddToPlaylist'
 import { useDragReorder } from '../hooks/useDragReorder'
 import { searchYouTube } from '../services/youtube'
+import { useBackgroundPlayback } from '../hooks/useBackgroundPlayback'
 import {
   ArrowLeft, Check, ChevronDown, Disc3, GripVertical, ListMusic, ListOrdered, Loader, LogIn, Mic2, MicOff, Minus, MoreVertical,
   Pause, Play, Plus, Repeat1, Search, Settings, Shuffle, SkipBack, SkipForward, Timer, TimerOff, Trash2,
@@ -820,6 +821,15 @@ useEffect(() => {
   const ToastIcon = modeToast?.icon
   const sleepLabel = `${Math.floor(sleepLeft / 60)}:${String(sleepLeft % 60).padStart(2, '0')}`
   const queueActive = view === 'queue' && !queueExiting
+  const controlsRef = useRef({})
+useEffect(() => {
+  controlsRef.current = {
+    toggle: togglePlay,
+    prev: () => { if (canPrev) playIndex(playbackCurrent - 1) },
+    next: () => { if (canNext) playIndex(nextIndex()) },
+  }
+})
+useBackgroundPlayback({ track: currentTrack, playing: playbackPlaying, controlsRef })
 
   return <>
     {/* The video lives here, off-screen. Only its audio is used. */}
