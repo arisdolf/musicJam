@@ -199,12 +199,15 @@ async function yt(path, params, signal) {
 
     if (response.ok) { addUsage(index, cost); return data }
 
-    const reason = data.error?.errors?.[0]?.reason || data.error?.status || ''
-    const error = new Error(friendlyError(reason, data.error?.message))
-    error.reason = reason
-    if (!QUOTA_REASONS.includes(reason)) throw error
-    markFull(index)
-    failure = error
+const reason = data.error?.errors?.[0]?.reason || data.error?.status || ''
+const quota = QUOTA_REASONS.includes(reason)
+  || response.status === 429
+  || /quota/i.test(data.error?.message || '')
+const error = new Error(friendlyError(quota ? 'quotaExceeded' : reason, data.error?.message))
+error.reason = quota ? 'quotaExceeded' : reason
+if (!quota) throw error
+markFull(index)
+failure = error
   }
 }
 
