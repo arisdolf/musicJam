@@ -1,6 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication'
+
 import {
-  createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider,
+  createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signInWithCredential,
   onAuthStateChanged, signOut, updateProfile, EmailAuthProvider, reauthenticateWithCredential,
   updatePassword, deleteUser,
 } from 'firebase/auth'
@@ -88,9 +91,15 @@ export function AccountProvider({ children }) {
   }, [])
 
   const logInWithGoogle = useCallback(async () => {
+  if (Capacitor.isNativePlatform()) {
+    const result = await FirebaseAuthentication.signInWithGoogle()
+    const credential = GoogleAuthProvider.credential(result.credential?.idToken)
+    await signInWithCredential(auth, credential)
+  } else {
     await signInWithPopup(auth, new GoogleAuthProvider())
-    setAuthMode(null)
-  }, [])
+  }
+  setAuthMode(null)
+}, [])
 
   const logOut = useCallback(() => signOut(auth), [])
 

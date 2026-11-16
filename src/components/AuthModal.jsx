@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
 import { useAccount } from '../features/account/AccountContext'
 import { X, Music2, LogIn, UserPlus } from 'lucide-react'
 
@@ -15,6 +16,7 @@ function GoogleIcon() {
 }
 
 export default function AuthModal() {
+  const isNative = Capacitor.isNativePlatform()
   const { authMode, openAuth, closeAuth, signUp, logIn, logInWithGoogle } = useAccount()
   const [name, setName]         = useState('')
   const [email, setEmail]       = useState('')
@@ -62,10 +64,12 @@ export default function AuthModal() {
         <p className="muted">{isSignup ? 'Save songs into playlists and listen to them any time.' : 'Log in to open your playlists.'}</p>
 
         {/* Google sign-in */}
-        <button type="button" className="btn btn-google btn-block" onClick={handleGoogle} disabled={busy}>
-          <GoogleIcon /> Continue with Google
-        </button>
-        <div className="divider"><span>or</span></div>
+        {!isNative && <>
+  <button type="button" className="btn btn-google btn-block" onClick={handleGoogle} disabled={busy}>
+    <GoogleIcon /> Continue with Google
+  </button>
+  <div className="divider"><span>or</span></div>
+</>}
 
         {isSignup && <label className="field">Name
           <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" autoFocus />

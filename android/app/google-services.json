@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "454283048854",
+    "firebase_url": "https://musicjam-4f12b-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "musicjam-4f12b",
+    "storage_bucket": "musicjam-4f12b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:454283048854:android:f2a617392b4e00520f0fb7",
+        "android_client_info": {
+          "package_name": "com.ronik.jamroom"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "454283048854-ln658u12u4s0eg5tk943gql3bpir1jsq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBuFMy5v5LZnrptRunIDIqyErPKGGQqp5Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "454283048854-ln658u12u4s0eg5tk943gql3bpir1jsq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
