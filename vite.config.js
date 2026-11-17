@@ -4,7 +4,8 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: '0.0.0.0',
-    // No proxy needed — all backend calls go directly to Firebase.
+    proxy: {
+      '/api': 'https://your-app.vercel.app',
+    },
   },
 })

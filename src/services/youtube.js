@@ -118,12 +118,12 @@ function isPopular(track, strictness = 1) {
 
 
 // ── Core search ───────────────────────────────────────────────────────────────
-function searchMusic(query, { signal, limit, order }) {
-  return cached(`${order}|${query.toLowerCase()}`, async () => {
+function searchMusic(query, { signal, limit, order, extra = {} }) {
+  return cached(`${order}|${JSON.stringify(extra)}|${query.toLowerCase()}`, async () => {
     const search = await yt('search', {
       part: 'snippet', type: 'video', videoCategoryId: '10',
       videoEmbeddable: 'true', videoSyndicated: 'true', regionCode: REGION,
-      maxResults: '50', order, q: `${query} audio`,
+      maxResults: '50', order, q: `${query} audio`, ...extra,
     }, signal)
     const ids = (search.items || []).map((item) => item.id?.videoId).filter(Boolean)
     if (!ids.length) return []
@@ -235,6 +235,7 @@ function toTrack(item) {
     id: item.id,
     title: snippet.title,
     artist: snippet.channelTitle.replace(/\s*-\s*topic$/i, ''),
+    channel: snippet.channelTitle,  
     thumbnail: snippet.thumbnails?.medium?.url || `https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`,
     duration: parseDuration(contentDetails?.duration),
     views: Number(statistics?.viewCount || 0),
@@ -318,7 +319,26 @@ const GENRES = [
 
 
 const BAD_VERSION = /\b(live|cover|remix|slowed|sped up|reverb|karaoke|instrumental|acoustic version|nightcore|8d|mashup|medley|tribute|loop)\b/i
+//eslint-disable-next-line no-misleading-character-class
 const FOREIGN_SCRIPT = /[\u0400-\u04FF\u0590-\u06FF\u0900-\u0DFF\u0E00-\u0E7F\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]/
+
+// Channels that re-upload other people's songs.
+const SPAM_CHANNEL = /\b(lyrics?|lyric|nation|vibes?|playlist|covers?|mix|radio|hits|songs|chill|best of|compilation|jukebox|karaoke|beats?|nightcore|reupload)\b/i
+// Labels and networks that really publish music (add more as you notice them).
+const LABELS = /\b(star music|star pop|viva (records|music)|gma music|universal records|sony music|warner music|ivory music|offshore music|tarsier records|cornerstone|abs-cbn|mca music|vevo|republic records|atlantic records|columbia records|interscope|capitol records|rca records|island records|hybe|smtown|jyp|yg entertainment)\b/i
+const norm = (text) => String(text || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+
+// True only for auto-generated Topic channels, VEVO, labels, or the artist's own channel.
+function isOfficialSource(track) {
+  const channel = track.channel || track.artist || ''
+  if (/\s-\s*topic$/i.test(channel) || /vevo$/i.test(channel)) return true
+  if (SPAM_CHANNEL.test(channel)) return false
+  if (LABELS.test(channel)) return true
+  // Artist channel: its name appears at the front of the title ("Artist - Song").
+  const name = norm(channel.replace(/\bofficial\b/gi, ''))
+  const head = norm(track.title.split(/\s[-–—|]\s/)[0])
+  return name.length >= 3 && head.length >= 3 && (head.includes(name) || name.includes(head))
+}
 
 const pick = (list, text) => list.find(([pattern]) => pattern.test(text))?.[1] || ''
 const titleKey = (title) => title.toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -353,7 +373,7 @@ function phChart(signal) {
 }
 
 export function getSimilarTracks(seed, signal) {
-  return cached(`similar3|${seed.id}`, async () => {
+  return cached(`similar4|${seed.id}`, async () => {
     let text = `${seed.title} ${seed.artist}`
     try {
       const data = await yt('videos', { part: 'snippet', id: seed.id }, signal)
@@ -366,24 +386,26 @@ export function getSimilarTracks(seed, signal) {
     const genre = pick(GENRES, text)
     const allowForeign = lang === 'K-pop' || lang === 'J-pop' || FOREIGN_SCRIPT.test(`${seed.title} ${seed.artist}`)
 
+    
     const vibeQuery = lang || mood
       ? `${[lang, mood, genre].filter(Boolean).join(' ')} hits`
       : `${genre || 'pop'} hits philippines`
 
     const [byArtist, byVibe, chart] = await Promise.all([
-      searchMusic(`${seed.artist} songs`, { signal, limit: 50, order: 'relevance' }),
-      searchMusic(vibeQuery, { signal, limit: 50, order: 'relevance' }),
-      phChart(signal),
-    ])
+  searchMusic(`${seed.artist} songs`, { signal, limit: 50, order: 'relevance' }),
+  searchMusic(vibeQuery, { signal, limit: 50, order: 'relevance', extra: lang === 'OPM Tagalog' ? { relevanceLanguage: 'tl' } : {} }),
+  phChart(signal),
+])
 
     const byViews = (list) => [...list].sort((a, b) => (b.views || 0) - (a.views || 0))
     const out = []
     const seen = new Set([seed.id, titleKey(seed.title)])
     const sameArtist = (track) => track.artist.toLowerCase() === seed.artist.toLowerCase()
     const good = (track, strictness) =>
-      isPopular(track, strictness)
-      && !BAD_VERSION.test(track.title)
-      && (allowForeign || !FOREIGN_SCRIPT.test(`${track.title} ${track.artist}`))
+  isPopular(track, strictness)
+  && !BAD_VERSION.test(track.title)
+  && (allowForeign || !FOREIGN_SCRIPT.test(`${track.title} ${track.artist}`))
+  && (isOfficialSource(track) || (sameArtist(track) && !SPAM_CHANNEL.test(track.channel || '')))
     const push = (track) => {
       if (seen.has(track.id) || seen.has(titleKey(track.title))) return false
       seen.add(track.id); seen.add(titleKey(track.title)); out.push(track)
@@ -394,12 +416,11 @@ export function getSimilarTracks(seed, signal) {
     for (const strictness of [2, 1]) {
       if (out.length >= 12) break
       // [source, max songs from it]; the vibe source appears twice so it fills the most slots.
-      const sources = [
-        { list: byViews(byArtist).filter((t) => sameArtist(t) && good(t, strictness)), cap: 8, taken: 0 },
-        { list: byViews(byVibe).filter((t) => good(t, strictness)), cap: 12, taken: 0 },
-        { list: byViews(chart).filter((t) => good(t, strictness)), cap: 8, taken: 0 },
-        { list: byViews(byVibe).filter((t) => good(t, strictness)), cap: 12, taken: 0 },
-      ]
+     const sources = [
+  { list: byViews(byArtist).filter((t) => sameArtist(t) && good(t, strictness)), cap: 8, taken: 0 },
+  { list: byViews(chart).filter((t) => good(t, strictness)), cap: 10, taken: 0 },
+  { list: byViews(byVibe).filter((t) => good(t, strictness)), cap: 7, taken: 0 },
+]
       let progress = true
       while (out.length < 25 && progress) {
         progress = false

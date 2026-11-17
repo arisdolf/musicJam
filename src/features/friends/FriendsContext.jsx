@@ -145,7 +145,7 @@ export function FriendsProvider({ children }) {
       if (!claim.committed) throw new Error('That username is taken.')
     } catch (error) {
       if (error.code === 'PERMISSION_DENIED' || /permission_denied/i.test(error.message)) {
-        throw new Error('That username is taken or the database rules are not set up yet.')
+        throw new Error('That username is taken or the database rules are not set up yet.', { cause: error })
       }
       throw error
     }

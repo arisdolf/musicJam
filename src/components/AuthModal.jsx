@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Capacitor } from '@capacitor/core'
+
 import { useAccount } from '../features/account/AccountContext'
 import { X, Music2, LogIn, UserPlus } from 'lucide-react'
 

@@ -10,13 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@capacitor-firebase/authentication": "^8.6.0",
-    "@capacitor/android": "^8.6.2",
-    "@capacitor/cli": "^8.6.2",
-    "@capacitor/core": "^8.6.2",
-    "@capawesome-team/capacitor-android-foreground-service": "^8.1.0",
     "dotenv": "^18.0.10",
-    "firebase": "^13.3.0",
+    "firebase": "^13.4.0",
     "firebase-admin": "^14.5.1",
     "lucide-react": "^0.468.0",
     "pg": "^8.23.1",

@@ -1,5 +1,5 @@
 // src/components/BottomNav.jsx  — mobile-only bottom navigation bar
-import { Home, ListMusic, Gauge, History, Settings, Users } from 'lucide-react'
+import { Home, ListMusic, History, Settings } from 'lucide-react'
 import { useAccount } from '../features/account/AccountContext'
 import { useFriends } from '../features/friends/FriendsContext'
 

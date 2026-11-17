@@ -126,6 +126,7 @@ input:focus {
 .feedback-overlay,
 .np-overlay {
   backdrop-filter: blur(8px);
+  overflow: hidden;
 }
 
 .modal::before,

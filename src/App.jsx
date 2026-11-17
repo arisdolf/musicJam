@@ -19,7 +19,7 @@ import PersistentPlayer from './components/PersistentPlayer'
 import QueueFly from './components/QueueFly'
 import { useAccount } from './features/account/AccountContext'
 import ErrorBoundary from './components/ErrorBoundary'
-import { playNow } from './utils/queue'
+import { playNow, replaceQueue } from './utils/queue'
 // ── Inner shell (needs AccountContext) ────────────────────────────────────────
 function Shell() {
   const { user } = useAccount()
@@ -54,6 +54,7 @@ const openFriends = useCallback(() => { setSettingsSection('friends'); setView('
     setUrlRoom(code)
   }, [setUrlRoom])
 
+  
     // Clicking a system notification: join the invited room, or open Friends.
   useEffect(() => {
     const open = (detail) => {
@@ -156,12 +157,12 @@ const navigate = useCallback((id) => {
       : { ...state, queue: [...state.queue, track], current: state.queue.length ? state.current : 0 })
   }, [roomCode, updateRoom, addLocalTrack, animateQueueAdd])
 
-  const playTracks = useCallback((tracks, index = 0) => {
-    if (!roomCode) { playLocalTracks(tracks, index); return }
-    if (!tracks[index]?.id) return
-    updateRoom((state) => playNow(state, tracks, index))
-    startVideo(tracks[index].id)
-  }, [roomCode, updateRoom, playLocalTracks, startVideo])
+ const playTracks = useCallback((tracks, index = 0) => {
+  if (!roomCode) { playLocalTracks(tracks, index); return }
+  if (!tracks[index]?.id) return
+  updateRoom((state) => replaceQueue(state, tracks, index))
+  startVideo(tracks[index].id)
+}, [roomCode, updateRoom, playLocalTracks, startVideo])
 
   const renderContent = () => {
     if (roomCode && view === 'home') {

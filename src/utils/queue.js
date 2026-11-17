@@ -18,3 +18,16 @@ export function playNow(state, tracks, index = 0) {
   }
   return { ...state, queue, current: queue.findIndex((item) => item.id === target.id), playing: true }
 }
+
+// Replaces the whole queue with this list and plays tracks[index].
+// Used when you press play inside a playlist, so playlists never stack.
+export function replaceQueue(state, tracks, index = 0) {
+  const all = Array.isArray(tracks) ? tracks : []
+  const target = all[index]
+  if (!target?.id) return state
+
+  const seen = new Set()
+  const queue = all.filter((track) => track?.id && !seen.has(track.id) && seen.add(track.id))
+  return { ...state, queue, current: queue.findIndex((item) => item.id === target.id), playing: true }
+}
+

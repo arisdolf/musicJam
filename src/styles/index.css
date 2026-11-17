@@ -1,6 +1,6 @@
 /* =============================================================================
    Jamroom stylesheet entry. Order matters: later files win ties.
-   foundation -> layout -> components -> pages -> mobile overrides -> theme
+   foundation -> layout -> components -> pages -> mobile overrides -> theme -> polish
    ============================================================================= */
 @import './tokens.css';
 @import './motion.css';
@@ -34,3 +34,4 @@
 
 
 @import './Theme.css';
+@import './Polish.css';

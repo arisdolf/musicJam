@@ -1,0 +1,195 @@
+/* Polish layer. Loaded LAST (after Theme.css). Delete this file to undo everything in it.
+   Applies tips from "10 Niche Design Hacks" and "20 Principles of UX & Animation".
+   Each section says which tip it is. */
+
+/* ── 3 + 2 + 8. OKLCH palette, alpha borders, dark-mode depth ──────────────────
+   Same hues as tokens.css, written in OKLCH so lightness is even across colours.
+   --line is now a translucent ink, so borders blend into whatever sits behind them.
+   --raised is the surface for floating things: in dark mode it is LIGHTER than the page. */
+:root {
+  --bg: oklch(1 0 0);
+  --surface: oklch(0.967 0.012 11);
+  --ink: oklch(0.18 0.037 13);
+  --muted: oklch(0.484 0.054 9);
+  --line: oklch(0.3 0.06 15 / 0.14);
+  --accent: oklch(0.467 0.18 25);
+  --accent-dark: oklch(0.405 0.156 24);
+  --accent-hover: oklch(0.405 0.156 24);
+  --accent-soft: oklch(0.942 0.023 11);
+  --accent-2: oklch(0.592 0.18 27);
+  --live: oklch(0.623 0.147 156);
+  --danger: oklch(0.593 0.193 36);
+  --danger-hover: oklch(0.524 0.173 36);
+  --danger-bg: oklch(0.984 0.009 45);
+  --danger-line: oklch(0.88 0.053 42);
+  --spot: linear-gradient(135deg in oklch, oklch(0.415 0.161 24), oklch(0.522 0.194 24));
+  --raised: var(--bg);
+  --edge-light: transparent;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: oklch(0.145 0.002 286);
+    --surface: oklch(0.196 0.002 286);
+    --ink: oklch(0.976 0 90);
+    --muted: oklch(0.72 0.006 286);
+    --line: oklch(1 0 0 / 0.1);
+    --accent: oklch(0.527 0.195 23);
+    --accent-dark: oklch(0.772 0.135 16);
+    --accent-hover: oklch(0.471 0.174 23);
+    --accent-soft: oklch(0.214 0.043 14);
+    --accent-2: oklch(0.759 0.144 26);
+    --live: oklch(0.818 0.164 159);
+    --danger: oklch(0.783 0.136 46);
+    --danger-hover: oklch(0.824 0.106 46);
+    --danger-bg: oklch(0.222 0.037 31);
+    --danger-line: oklch(0.391 0.086 39);
+    --spot: linear-gradient(135deg in oklch, oklch(0.443 0.171 24), oklch(0.56 0.2 24));
+    --raised: oklch(0.232 0.004 286);
+    --edge-light: oklch(1 0 0 / 0.07);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: oklch(0.145 0.002 286);
+  --surface: oklch(0.196 0.002 286);
+  --ink: oklch(0.976 0 90);
+  --muted: oklch(0.72 0.006 286);
+  --line: oklch(1 0 0 / 0.1);
+  --accent: oklch(0.527 0.195 23);
+  --accent-dark: oklch(0.772 0.135 16);
+  --accent-hover: oklch(0.471 0.174 23);
+  --accent-soft: oklch(0.214 0.043 14);
+  --accent-2: oklch(0.759 0.144 26);
+  --live: oklch(0.818 0.164 159);
+  --danger: oklch(0.783 0.136 46);
+  --danger-hover: oklch(0.824 0.106 46);
+  --danger-bg: oklch(0.222 0.037 31);
+  --danger-line: oklch(0.391 0.086 39);
+  --spot: linear-gradient(135deg in oklch, oklch(0.443 0.171 24), oklch(0.56 0.2 24));
+  --raised: oklch(0.232 0.004 286);
+  --edge-light: oklch(1 0 0 / 0.07);
+}
+
+/* 8. Dark mode depth: floating surfaces are lighter than the page and get a faint top highlight,
+   because shadows barely show on a dark background. In light mode --raised is just --bg. */
+.popover, .modal, .feedback-card, .invite-toast {
+  background: var(--raised);
+  box-shadow: inset 0 1px 0 var(--edge-light), var(--shadow-pop);
+}
+.mini-player {
+  background: color-mix(in oklch, var(--raised) 88%, transparent);
+  box-shadow: inset 0 1px 0 var(--edge-light), var(--shadow-pop), 0 0 0 1px color-mix(in oklch, var(--accent) 18%, transparent);
+}
+.playlist-card:hover { box-shadow: inset 0 1px 0 var(--edge-light), var(--shadow-pop); }
+
+/* 4. OKLCH gradients: no muddy middle where two colours blend. */
+.playlist-detail-hero {
+  background: linear-gradient(125deg in oklch, color-mix(in oklch, var(--accent) 18%, var(--bg)), var(--bg) 72%);
+}
+.np-seek::-webkit-slider-runnable-track {
+  background: linear-gradient(to right in oklch, oklch(0.56 0.2 24) 0, #fff var(--pct), rgba(255, 255, 255, .22) var(--pct));
+}
+.np-lyrics-list p.current {
+  background: linear-gradient(90deg in oklch, oklch(0.56 0.2 24 / .28), rgba(255, 255, 255, .1));
+}
+
+/* 1. Concentric radius: inner radius = outer radius - the padding between them. */
+.popover { --pad: 8px; --r: 18px; padding: var(--pad); border-radius: var(--r); }
+.popover-item, .popover-new input, .popover-new .btn { border-radius: calc(var(--r) - var(--pad)); }
+@media (max-width: 480px) { .popover { --pad: 12px; } }
+
+.mini-player { --r: 22px; --pad: 6px; border-radius: var(--r); }
+.mini-open img { border-radius: calc(var(--r) - var(--pad)); }
+
+.playlist-card { --r: 20px; border-radius: var(--r); }
+.playlist-card-open { --pad: 10px; padding: var(--pad); grid-template-columns: 68px minmax(0, 1fr) 34px; }
+.playlist-card-open .playlist-cover { border-radius: calc(var(--r) - var(--pad)); }
+
+.invite-toast { --r: 16px; --pad: 10px; border-radius: var(--r); }
+.invite-toast .btn-small { border-radius: calc(var(--r) - var(--pad)); }
+
+/* 5. Match icon weight to the text beside it. Lucide draws every icon at stroke 2, which looks
+   too light next to 600-weight labels and too heavy at tiny sizes. */
+.btn svg, h2 svg, .block-toggle svg, .np-menu button svg { stroke-width: 2.25; }
+.btn-small svg, .chip svg, .popover-check svg, .popover-status svg { stroke-width: 2.6; }
+.sidenav-item.active svg, .bottom-nav-item.active svg { stroke-width: 2.4; }
+.sidenav-item:not(.active) svg, .bottom-nav-item:not(.active) svg { stroke-width: 1.9; }
+.mini-play svg, .np-play svg { stroke-width: 2.4; }
+
+/* 6. Masked edges: long lists fade out where they scroll, instead of being cut off by a hard line.
+   The fade only appears on a side that still has content past it (scroll-driven, no JS). */
+@property --fade-t { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --fade-b { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@keyframes scroll-edge-fade {
+  0%       { --fade-t: 0px;  --fade-b: 28px; }
+  6%, 94%  { --fade-t: 28px; --fade-b: 28px; }
+  100%     { --fade-t: 28px; --fade-b: 0px; }
+}
+@supports (animation-timeline: scroll()) {
+  .popover-list, .np-lyrics-list, .np-queue-list, .dropdown-panel, .similar-results, .modal .friends-list {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade-t), #000 calc(100% - var(--fade-b)), transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade-t), #000 calc(100% - var(--fade-b)), transparent 100%);
+    animation: scroll-edge-fade linear both;
+    animation-timeline: scroll(self);
+  }
+}
+
+/* 7. Blurred icon swap: when play/pause (or any .motion-icon) changes, the old and new icon
+   cross over with a little blur so they read as one icon morphing, not two icons popping. */
+@keyframes icon-swap {
+  from { opacity: 0; transform: scale(.6); filter: blur(4px); }
+}
+.motion-icon { animation: icon-swap 220ms var(--ease-out) backwards; }
+
+/* 9. Dynamic viewport: 100vh on a phone includes the area behind the browser bars. dvh does not. */
+body { min-height: 100vh; min-height: 100dvh; }
+#root { min-height: 100vh; min-height: 100dvh; }
+
+/* ── UX principles ───────────────────────────────────────────────────────────── */
+
+/* Doherty threshold (respond within 400ms): remove the 300ms tap delay and the grey tap flash,
+   so every press answers instantly. */
+button, a, input, [role="button"], [role="checkbox"] { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+
+/* Frequency of use: the more something is used, the less it should animate.
+   Search results re-render on every keystroke, and tab changes happen all day, so they get no
+   stagger and a shorter fade. Rarer things (modals, popover, playlist cards) keep their motion. */
+.results > .track { animation: none; }
+.route-stage { animation-duration: 160ms; }
+.np-queue-list li { animation: none; }
+
+/* Fitts's law + bigger hit areas: the visible button stays the same size, but the tappable area
+   grows to about 44px. The invisible ::after sits on top of the neighbours' gaps, not on them. */
+.icon-btn, .np-icon, .np-circle, .mini-play, .track-play, .np-drag-handle, .queue-drag-handle,
+.lyric-offset button, .np-pager button, .btn-small { position: relative; }
+.modal-close::after { content: ""; position: absolute; inset: -4px; }
+.icon-btn::after, .np-circle::after { content: ""; position: absolute; inset: -4px; }
+.np-icon::after, .mini-play::after { content: ""; position: absolute; inset: -3px; }
+.np-icon.small::after { inset: -5px; }
+.track-play::after { content: ""; position: absolute; inset: -10px -4px; }
+.np-drag-handle::after, .queue-drag-handle::after { content: ""; position: absolute; inset: -4px -6px; }
+.lyric-offset button::after { content: ""; position: absolute; inset: -6px; }
+.np-pager button::after { content: ""; position: absolute; inset: -9px -5px; }
+.btn-small::after { content: ""; position: absolute; inset: -5px 0; }
+
+/* Exaggerated feedback: an error should be impossible to miss, so it shakes once. */
+@keyframes shake {
+  20%, 60% { transform: translateX(-5px); }
+  40%, 80% { transform: translateX(5px); }
+  100% { transform: none; }
+}
+.form-error, .popover-status.error { animation: shake 360ms var(--ease-out); }
+
+/* Follow through: the heart overshoots a little and settles, like a real object would. */
+@keyframes heart-pop {
+  0%   { transform: scale(.8); opacity: 0; }
+  55%  { transform: scale(1.22); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+/* Everything above that moves respects reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  .form-error, .popover-status.error, .motion-icon { animation: none; }
+}
+
+/* Remove the red accent strip from the top of modals and cards. */
+.modal::before, .feedback-card::before { display: none; }
