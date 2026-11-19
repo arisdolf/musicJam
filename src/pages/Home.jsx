@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Check, Flame, Loader, Play, Plus, RotateCw } from 'lucide-react'
+import { Check, Flame, Loader, Play, Plus, RotateCw, Trash2} from 'lucide-react'
 import HomeSearch from '../components/HomeSearch'
 import LikeButton from '../components/LikeButton'
 import { getTrending } from '../services/youtube'

@@ -4,7 +4,7 @@ import { Music2, Home, ListMusic, History, Settings, CirclePlus} from 'lucide-re
 
 const NAV = [
   { id: 'home',      label: 'Home',         icon: Home },
-  { id: 'create', label: 'Create Room', icon: CirclePlus },
+  { id: 'create', label: 'Jam Room', icon: CirclePlus },
   { id: 'playlists', label: 'Playlists',    icon: ListMusic, authOnly: true },
   { id: 'recent',    label: 'Recent Rooms', icon: History },
   { id: 'settings',  label: 'Settings',     icon: Settings,  authOnly: true },

@@ -5,12 +5,12 @@ import { useFriends } from '../features/friends/FriendsContext'
 
 const NAV_GUEST = [
   { id: 'home',   label: 'Home', icon: Home },
-   { id: 'create', label: 'Create', icon: CirclePlus },
+   { id: 'create', label: 'JamRoom', icon: CirclePlus },
   { id: 'recent', label: 'Rooms', icon: History },
 ]
 const NAV_AUTH = [
   { id: 'home',      label: 'Home',      icon: Home },
-  { id: 'create',    label: 'Create',    icon: CirclePlus },
+  { id: 'create',    label: 'JamRoom',    icon: CirclePlus },
   { id: 'playlists', label: 'Playlists', icon: ListMusic },
   { id: 'recent',    label: 'Rooms',     icon: History },
   { id: 'settings',  label: 'Settings',  icon: Settings },
