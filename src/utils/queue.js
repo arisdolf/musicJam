@@ -31,3 +31,13 @@ export function replaceQueue(state, tracks, index = 0) {
   return { ...state, queue, current: queue.findIndex((item) => item.id === target.id), playing: true }
 }
 
+export function playNext(state, track) {
+  if (!track?.id) return state
+  if (!state.queue.length) return { ...state, queue: [track], current: 0 }
+  const currentId = state.queue[state.current]?.id
+  if (track.id === currentId) return state
+  const queue = state.queue.filter((item) => item.id !== track.id)
+  const at = queue.findIndex((item) => item.id === currentId) + 1
+  queue.splice(at, 0, track)
+  return { ...state, queue, current: at - 1 }
+}

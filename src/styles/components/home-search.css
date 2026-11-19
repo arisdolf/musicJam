@@ -1,0 +1,16 @@
+/* Home search: a round button that stretches into a search bar. */
+.home-search { margin: 0 0 22px; }
+.hs-bar { display: flex; align-items: center; width: 44px; height: 44px; margin-left: auto; overflow: hidden; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); transition: width 420ms var(--ease-in-out), border-color var(--dur-fast), box-shadow var(--dur-fast); }
+.hs-bar.open { width: 100%; border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent); }
+.hs-toggle { flex: none; width: 42px; height: 42px; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; color: var(--ink); }
+.hs-bar.open .hs-toggle { color: var(--accent-dark); }
+.hs-form { flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; padding-right: 4px; opacity: 0; pointer-events: none; transition: opacity 160ms var(--ease-out); }
+.hs-bar.open .hs-form { opacity: 1; pointer-events: auto; transition: opacity 240ms var(--ease-out) 180ms; }
+.hs-form input { flex: 1; min-width: 0; height: 42px; padding: 0 4px; border: 0; border-radius: 0; background: none; box-shadow: none; text-align: left; }
+.hs-form input:focus { box-shadow: none; }
+
+.hs-results { margin-top: 10px; max-height: min(52dvh, 420px); overflow-y: auto; overscroll-behavior: contain; text-align: left; animation: enter 260ms var(--ease-out) backwards; }
+.hs-row .track-text { cursor: pointer; }
+.hs-row.is-busy { opacity: .7; }
+
+.hs-results.is-stale .track { opacity: .55; transition: opacity 150ms; }

@@ -10,6 +10,7 @@ function formatCountdown(ms) {
 }
 
 export default function Quota() {
+ 
   const [keys, setKeys] = useState(quotaStatus)
   const [reset, setReset] = useState(msUntilReset)
 
@@ -20,7 +21,7 @@ export default function Quota() {
     const timer = setInterval(refresh, 5000)
     return () => { window.removeEventListener('jamroom:quota', refresh); clearInterval(timer) }
   }, [])
-
+ const available = keys.filter((key) => key.remaining > 0).length
   const totalUsed = keys.reduce((sum, key) => sum + key.used, 0)
   const totalLimit = keys.length * QUOTA_LIMIT
   const serverKeyOnly = keys.length === 1 && keys[0].label === 'Server key'
@@ -37,6 +38,7 @@ export default function Quota() {
     <section className="quota-total">
       <span className="eyebrow">{serverKeyOnly ? 'SERVER KEY' : 'ALL KEYS'}</span>
       <strong>{totalUsed.toLocaleString()} <small>/ {totalLimit.toLocaleString()} units</small></strong>
+      <small>{available} of {keys.length} {keys.length === 1 ? 'key' : 'keys'} available</small>
     </section>
 
     <ul className="quota-list">
@@ -51,14 +53,15 @@ export default function Quota() {
           <div className="quota-bar"><span style={{ width: `${pct}%` }} /></div>
           <div className="quota-nums">
             <span>{key.used.toLocaleString()} used</span>
-            <span>{key.remaining.toLocaleString()} left</span>
+<span>{key.remaining.toLocaleString()} left · ~{Math.floor(key.remaining / 101)} searches</span>
+            
           </div>
         </li>
       })}
     </ul>
 
     <p className="muted quota-note">Counted in this browser only. A search costs about 101 units (100 for the search, 1 for the video details).</p>
-    {serverKeyOnly && <p className="muted quota-note">Your keys live on the server, so they show as one.</p>}
+    {serverKeyOnly && <p className="muted quota-note">Keys live on the server.</p>}
     <button className="btn btn-small btn-text" onClick={resetQuota}><RotateCcw size={14} /> Reset local counter</button>
   </main>
 }

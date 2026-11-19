@@ -18,7 +18,7 @@ export default function Sidenav({ view, onNavigate }) {
     <nav className="sidenav" aria-label="Main navigation">
       <div className="sidenav-logo">
         <span className="logo-mark"><Music2 size={16} strokeWidth={2.4} /></span>
-        <span className="sidenav-logo-text">jamroom</span>
+        <span className="sidenav-logo-text">melojam</span>
       </div>
 
       <ul className="sidenav-nav">

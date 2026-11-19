@@ -6,7 +6,7 @@ import ConfirmModal from '../components/ConfirmModal'
 import { layoutTransitionName, withViewTransition } from '../utils/viewTransitions'
 import { parseExportifyCsv } from '../services/importCsv'
 import { matchSong } from '../services/youtube'
-
+import { useTopbar } from '../components/TopBarContext'
 
 
 export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
@@ -30,7 +30,7 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
     const query = search.trim().toLowerCase()
     return query ? playlists.filter((playlist) => playlist.name.toLowerCase().includes(query)) : playlists
   }, [playlists, search])
-
+  useTopbar(selected ? selected.name : '', selected ? () => showPlaylists() : null)
   if (!user) {
     return <main className="page narrow playlist-page">
       <div className="playlist-page-heading"><span className="page-icon"><ListMusic size={21} /></span><div><h1>Your playlists</h1><p className="muted">Keep your favorite tracks together.</p></div></div>
@@ -177,7 +177,6 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
 
   if (selected) {
     return <main className="page playlist-page">
-      <button className="btn btn-text playlist-back" onClick={showPlaylists}><ArrowLeft size={16} /> All playlists</button>
       <section className="playlist-detail-hero">
         <div className="playlist-cover large" style={{ viewTransitionName: layoutTransitionName(selected.id) }} aria-hidden="true">
           {selected.tracks.slice(0, 4).map((track, index) => <img key={`${track.id}-${index}`} src={track.thumbnail || ''} alt="" />)}

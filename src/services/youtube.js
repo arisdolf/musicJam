@@ -5,8 +5,10 @@ const REGION = 'PH'
 const CACHE_TTL = 10 * 60 * 1000
 const KEYS = (import.meta.env.VITE_YOUTUBE_API_KEYS || import.meta.env.VITE_YOUTUBE_API_KEY || '')
   .split(',').map((key) => key.trim()).filter(Boolean)
+
 // With no keys in the browser env the server picks the key, so we track it as one "Server key".
-const KEY_COUNT = Math.max(KEYS.length, 1)
+const SERVER_KEY_COUNT = Number(import.meta.env.VITE_YOUTUBE_KEY_COUNT) || 0
+const KEY_COUNT = Math.max(KEYS.length, SERVER_KEY_COUNT, 1)
 const QUOTA_REASONS = ['quotaExceeded', 'dailyLimitExceeded', 'RESOURCE_EXHAUSTED']
 
 // ── Quota tracking (local to this browser) ────────────────────────────────────
@@ -44,7 +46,7 @@ function markFull(index) {
 export function quotaStatus() {
   const { used } = readUsage()
   return Array.from({ length: KEY_COUNT }, (_, i) => ({
-    label: KEYS.length ? `Key ${i + 1}` : 'Server key',
+    label: KEYS.length || KEY_COUNT > 1 ? `Key ${i + 1}` : 'Server key',
     hint: KEYS[i] ? KEYS[i].slice(-4) : '',
     used: used[i] || 0,
     remaining: Math.max(0, QUOTA_LIMIT - (used[i] || 0)),
@@ -193,7 +195,7 @@ async function yt(path, params, signal) {
     tried.add(index)
 
     const query = new URLSearchParams({ path, ...params })
-    if (KEYS.length) query.set('keyIndex', String(index))
+    if (KEYS.length || KEY_COUNT > 1) query.set('keyIndex', String(index))
     const response = await fetch(`${API_BASE}/api/youtube?${query}`, { signal })
     const data = await response.json().catch(() => ({}))
 
@@ -435,4 +437,51 @@ export function getSimilarTracks(seed, signal) {
     }
     return out
   })
+}
+
+// ── Fast search for the home search box ───────────────────────────────────────
+// One API call and 12 results, and no per-video filtering. Duration and views are filled in
+// later by getTrackDetails, only for the song the listener actually picks.
+const decodeHtml = (text) => {
+  const el = document.createElement('textarea')
+  el.innerHTML = text
+  return el.value
+}
+
+export function quickSearch(query, signal) {
+  return cached(`quick|${query.toLowerCase()}`, async () => {
+    const search = await yt('search', {
+      part: 'snippet', type: 'video', videoCategoryId: '10',
+      videoEmbeddable: 'true', videoSyndicated: 'true', regionCode: REGION,
+      maxResults: '12', order: 'relevance', q: `${query} audio`,
+    }, signal)
+    return (search.items || [])
+      .filter((item) => item.id?.videoId && !NOT_A_SONG.test(item.snippet?.title || ''))
+      .map((item) => {
+        const { snippet } = item
+        const id = item.id.videoId
+        return {
+          id,
+          title: decodeHtml(snippet.title),
+          artist: decodeHtml(snippet.channelTitle).replace(/\s*-\s*topic$/i, ''),
+          channel: snippet.channelTitle,
+          thumbnail: snippet.thumbnails?.medium?.url || `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
+          duration: 0,
+          views: 0,
+          year: Number((snippet.publishedAt || '').slice(0, 4)) || 0,
+        }
+      })
+  })
+}
+
+// 1 quota unit. Adds duration and views so lyrics match the right version.
+export async function getTrackDetails(track, signal) {
+  try {
+    const data = await yt('videos', { part: 'snippet,contentDetails,statistics', id: track.id }, signal)
+    const item = data.items?.[0]
+    return item ? { ...track, ...toTrack(item), thumbnail: track.thumbnail } : track
+  } catch (error) {
+    if (error.name === 'AbortError') throw error
+    return track
+  }
 }

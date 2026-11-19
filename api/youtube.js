@@ -4,6 +4,7 @@ const QUOTA_REASONS = ['quotaExceeded', 'dailyLimitExceeded', 'RESOURCE_EXHAUSTE
 const KEY_PROBLEMS = ['keyInvalid', 'API_KEY_INVALID', 'ipRefererBlocked']
 const dead = new Set() // best effort: resets on cold start
 
+
 const looksLikeQuota = (data, status) => {
   const reason = data.error?.errors?.[0]?.reason || ''
   return QUOTA_REASONS.includes(reason)

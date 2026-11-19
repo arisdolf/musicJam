@@ -193,3 +193,46 @@ button, a, input, [role="button"], [role="checkbox"] { touch-action: manipulatio
 
 /* Remove the red accent strip from the top of modals and cards. */
 .modal::before, .feedback-card::before { display: none; }
+
+/* ── Lyric window (cover mode): show the whole current line ── */
+.np-lyric-window { height: auto; min-height: 88px; max-height: 150px; flex: 0 1 auto; justify-content: center; overflow: hidden; }
+.np-lyric-window p { overflow-wrap: anywhere; }
+.np-lyric-window p:not(.current) { -webkit-line-clamp: 1; }
+.np-lyric-window p.current { display: block; -webkit-line-clamp: unset; overflow: visible; font-size: clamp(15px, 4.4vw, 18px); }
+.np-lyric-window p.current.long { font-size: 15px; }
+/* leave a little more room for the taller lyric box */
+.np-body:not(.no-lyrics) .np-stage:not(.is-lyrics) { width: min(100%, clamp(110px, calc(var(--np-h) - 490px), 42dvh)); }
+
+/* ── Song rows: compact action groups ── */
+.track-actions, .queue-actions { display: flex; align-items: center; flex: none; }
+.track-actions .icon-btn, .queue-actions .icon-btn { width: 34px; height: 34px; }
+@media (max-width: 480px) { .track-actions .icon-btn, .queue-actions .icon-btn { width: 30px; height: 30px; } }
+
+/* ── Room queue row ── */
+.queue-track { gap: 6px; }
+.queue-drag-handle { width: 20px; flex: none; }
+.queue-track .track-text { flex: 1 1 0; min-width: 0; }
+.queue-thumb { position: relative; flex: none; display: block; padding: 0; border: 0; background: none; border-radius: 6px; overflow: hidden; }
+.queue-thumb img { display: block; }
+.queue-thumb.is-playing::before { content: ""; position: absolute; inset: 0; background: rgba(0, 0, 0, .5); }
+.queue-track.active::after { content: none; } /* old equalizer that pushed the row wide */
+.eq-bars {
+  position: absolute; inset: 0; margin: auto; width: 16px; height: 14px;
+  background:
+    linear-gradient(var(--accent), var(--accent)) 0 100% / 3px 100% no-repeat,
+    linear-gradient(var(--accent-2), var(--accent-2)) 6px 100% / 3px 100% no-repeat,
+    linear-gradient(var(--live), var(--live)) 12px 100% / 3px 100% no-repeat;
+  animation: eq 1s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { .eq-bars { animation: none; } }
+
+/* ── Hide scrollbars everywhere (scrolling still works) ── */
+* {
+  scrollbar-width: none;          /* Firefox */
+  -ms-overflow-style: none;       /* old Edge */
+}
+*::-webkit-scrollbar {
+  display: none;                  /* Chrome, Safari, Edge, Android */
+  width: 0;
+  height: 0;
+}

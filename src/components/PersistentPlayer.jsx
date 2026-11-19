@@ -6,10 +6,10 @@ import { rubberBandAtBounds } from '../utils/motion'
 import AddToPlaylist from './AddToPlaylist'
 import { useDragReorder } from '../hooks/useDragReorder'
 import { searchYouTube } from '../services/youtube'
-
+import { playNext } from '../utils/queue'
 import {
   ArrowLeft, Check, ChevronDown, Disc3, GripVertical, ListMusic, ListOrdered, Loader, LogIn, Mic2, MicOff, Minus, MoreVertical,
-  Pause, Play, Plus, Repeat1, Search, Settings, Shuffle, SkipBack, SkipForward, Timer, TimerOff, Trash2,
+  Pause, Play, Plus, Repeat1, Search, Shuffle, SkipBack, SkipForward, Timer, TimerOff, Trash2, ListStart
 } from 'lucide-react'
 
 // 1 second of silence. Looping it keeps the phone treating this page as "playing media".
@@ -38,9 +38,9 @@ const SWIPE_MIN = 50       // px of horizontal travel that counts as a swipe
 
 const MODE_ORDER = ['order', 'repeat', 'shuffle']
 const MODES = {
-  order:   { label: 'Playing in order',    icon: ListOrdered },
-  repeat:  { label: 'Repeating this song', icon: Repeat1 },
-  shuffle: { label: 'Shuffle on',          icon: Shuffle },
+  order: { label: 'Playing in order', icon: ListOrdered },
+  repeat: { label: 'Repeating this song', icon: Repeat1 },
+  shuffle: { label: 'Shuffle on', icon: Shuffle },
 }
 
 // Room sync: how far (seconds) this device may drift from the room clock before we seek.
@@ -77,11 +77,12 @@ function readResume() {
 
 // `sync` is { now() } while a room drives playback (null for local listening). It makes the player
 // follow the room's shared position, so someone joining mid-song lands at the same part.
-export default function PersistentPlayer({ playback, onPlaybackChange, onNavigate, onPlayTrack, onQueueTrack, sync }) {
+export default function PersistentPlayer({ playback, onPlaybackChange, onNavigate, onPlayTrack, onQueueTrack, onPlayNext, sync }) {
   const { registerPlayer } = usePlayback()
   const { user, openAuth } = useAccount()
-  const keepAliveRef = useRef(null)
-const userPauseRef = useRef(0) // when the listener last paused on purpose
+  const [ytState, setYtState] = useState(-1)
+  const ytStateTimer = useRef(0)
+  const userPauseRef = useRef(0) // when the listener last paused on purpose
   const [playerReady, setPlayerReady] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [view, setView] = useState('player')        // 'player' | 'queue' | 'search'
@@ -113,6 +114,7 @@ const userPauseRef = useRef(0) // when the listener last paused on purpose
   const playbackCurrent = playback.current
   const playbackPlaying = playback.playing
   const syncStamp = playback.syncedAt
+  const showPause = playerReady && playbackPlaying && (ytState === 1 || ytState === 3)
   const currentTrack = playbackQueue[playbackCurrent] || null
   const currentTrackId = currentTrack?.id
   const currentTrackLyricsId = currentTrack?.lyricsId
@@ -186,7 +188,7 @@ const userPauseRef = useRef(0) // when the listener last paused on purpose
   const showPage = (toLyrics) => { setSlideDir(toLyrics ? 'right' : 'left'); setLyricsFull(toLyrics) }
 
   const startSwipe = (event) => {
-       if (event.pointerType === 'mouse' && event.button !== 0) return
+    if (event.pointerType === 'mouse' && event.button !== 0) return
     if (!event.currentTarget.contains(event.target) || event.target.closest?.('button, input, a, [role="button"]')) return
     const stage = stageRef.current
     if (!stage) return
@@ -235,67 +237,67 @@ const userPauseRef = useRef(0) // when the listener last paused on purpose
   }
 
   // Swipe the mini player: left = next song, right = previous song (like Spotify).
-const miniRef = useRef(null)
-const swipedRef = useRef(false)
-const startMiniSwipe = (event) => {
-  if (event.pointerType === 'mouse' && event.button !== 0) return
-  if (event.target.closest?.('.mini-play, .icon-btn')) return // let the buttons work normally
-  const bar = miniRef.current
-  if (!bar) return
-  const startX = event.clientX
-  const startY = event.clientY
-  let dragging = false
-  
-  let dx = 0
-  const canGo = (delta) => delta < 0 ? canNext : canPrev
+  const miniRef = useRef(null)
+  const swipedRef = useRef(false)
+  const startMiniSwipe = (event) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    if (event.target.closest?.('.mini-play, .icon-btn')) return // let the buttons work normally
+    const bar = miniRef.current
+    if (!bar) return
+    const startX = event.clientX
+    const startY = event.clientY
+    let dragging = false
 
-  const move = (e) => {
-    dx = e.clientX - startX
-    if (!dragging) {
-      if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(e.clientY - startY)) return
-      dragging = true
-      swipedRef.current = true 
+    let dx = 0
+    const canGo = (delta) => delta < 0 ? canNext : canPrev
+
+    const move = (e) => {
+      dx = e.clientX - startX
+      if (!dragging) {
+        if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(e.clientY - startY)) return
+        dragging = true
+        swipedRef.current = true
+      }
+      const pull = canGo(dx) ? dx : dx * 0.25 // rubber band if there is no song that way
+      bar.style.transition = 'none'
+      bar.style.transform = `translateX(${pull}px)`
+      bar.style.opacity = String(1 - Math.min(Math.abs(pull) / 260, 0.5))
     }
-    const pull = canGo(dx) ? dx : dx * 0.25 // rubber band if there is no song that way
-    bar.style.transition = 'none'
-    bar.style.transform = `translateX(${pull}px)`
-    bar.style.opacity = String(1 - Math.min(Math.abs(pull) / 260, 0.5))
-  }
-  const end = () => {
-    window.removeEventListener('pointermove', move)
-    window.removeEventListener('pointerup', end)
-    window.removeEventListener('pointercancel', end)
-    setTimeout(() => { swipedRef.current = false }, 50)
-    if (!dragging) return
-    const reset = () => { bar.style.transition = ''; bar.style.transform = ''; bar.style.opacity = '' }
-    if (Math.abs(dx) >= SWIPE_MIN && canGo(dx)) {
-      const next = dx < 0
-      bar.style.transition = 'transform 140ms var(--ease-in-out), opacity 140ms var(--ease-in-out)'
-      bar.style.transform = `translateX(${next ? -90 : 90}px)`
-      bar.style.opacity = '0'
-      setTimeout(() => {
-        playIndex(next ? nextIndex() : playbackCurrent - 1)
-        // come back in from the opposite side
-        bar.style.transition = 'none'
-        bar.style.transform = `translateX(${next ? 90 : -90}px)`
-        requestAnimationFrame(() => {
-          bar.style.transition = 'transform 220ms var(--ease-out), opacity 220ms var(--ease-out)'
-          bar.style.transform = ''
-          bar.style.opacity = ''
-          setTimeout(reset, 240)
-        })
-      }, 140)
-    } else {
-      bar.style.transition = 'transform 260ms var(--ease-in-out), opacity 260ms var(--ease-in-out)'
-      bar.style.transform = ''
-      bar.style.opacity = ''
-      setTimeout(reset, 270)
+    const end = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', end)
+      window.removeEventListener('pointercancel', end)
+      setTimeout(() => { swipedRef.current = false }, 50)
+      if (!dragging) return
+      const reset = () => { bar.style.transition = ''; bar.style.transform = ''; bar.style.opacity = '' }
+      if (Math.abs(dx) >= SWIPE_MIN && canGo(dx)) {
+        const next = dx < 0
+        bar.style.transition = 'transform 140ms var(--ease-in-out), opacity 140ms var(--ease-in-out)'
+        bar.style.transform = `translateX(${next ? -90 : 90}px)`
+        bar.style.opacity = '0'
+        setTimeout(() => {
+          playIndex(next ? nextIndex() : playbackCurrent - 1)
+          // come back in from the opposite side
+          bar.style.transition = 'none'
+          bar.style.transform = `translateX(${next ? 90 : -90}px)`
+          requestAnimationFrame(() => {
+            bar.style.transition = 'transform 220ms var(--ease-out), opacity 220ms var(--ease-out)'
+            bar.style.transform = ''
+            bar.style.opacity = ''
+            setTimeout(reset, 240)
+          })
+        }, 140)
+      } else {
+        bar.style.transition = 'transform 260ms var(--ease-in-out), opacity 260ms var(--ease-in-out)'
+        bar.style.transform = ''
+        bar.style.opacity = ''
+        setTimeout(reset, 270)
+      }
     }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', end)
+    window.addEventListener('pointercancel', end)
   }
-  window.addEventListener('pointermove', move)
-  window.addEventListener('pointerup', end)
-  window.addEventListener('pointercancel', end)
-}
 
 
   // ── Room sync helpers ──────────────────────────────────────────────────────
@@ -362,8 +364,8 @@ const startMiniSwipe = (event) => {
   }, [mode, playbackQueue.length, playbackCurrent])
 
   const changePlaying = useCallback((playing) => {
-  if (!playing) userPauseRef.current = Date.now()
-  const track = playbackQueue[playbackCurrent]
+    if (!playing) userPauseRef.current = Date.now()
+    const track = playbackQueue[playbackCurrent]
     if (!track) return
     onPlaybackChange((state) => ({ ...state, playing }), { position: livePosition() })
     if (playing) requestVideo(track)
@@ -371,7 +373,7 @@ const startMiniSwipe = (event) => {
   }, [onPlaybackChange, playbackCurrent, playbackQueue, requestVideo, livePosition])
 
   const resumeRef = useRef(undefined) // where the last session stopped; used once, on the first load
-if (resumeRef.current === undefined) resumeRef.current = readResume()
+  if (resumeRef.current === undefined) resumeRef.current = readResume()
 
   // Tell the room where the playhead was moved to.
   const seekRoom = useCallback((seconds) => {
@@ -380,7 +382,6 @@ if (resumeRef.current === undefined) resumeRef.current = readResume()
 
   // If the browser blocked autoplay, the first click should actually start the video.
   const togglePlay = () => {
-  keepAliveRef.current?.play().catch(() => {})
     const state = playerRef.current?.getPlayerState?.()
     if (playbackPlaying && (state === -1 || state === 5) && currentTrack) {
       requestVideo(currentTrack, true)
@@ -395,7 +396,7 @@ if (resumeRef.current === undefined) resumeRef.current = readResume()
     return { ...state, queue, current, playing: queue.length ? state.playing : false }
   }), [onPlaybackChange])
 
-    const moveTrack = useCallback((from, to) => onPlaybackChange((state) => {
+  const moveTrack = useCallback((from, to) => onPlaybackChange((state) => {
     if (from === to || from < 0 || to < 0 || from >= state.queue.length || to >= state.queue.length) return state
     const currentId = state.queue[state.current]?.id
     const queue = [...state.queue]
@@ -455,7 +456,7 @@ if (resumeRef.current === undefined) resumeRef.current = readResume()
     return () => clearTimeout(timer)
   }, [modeToast])
 
-  useEffect(() => () => clearTimeout(queueTimerRef.current), [])
+  useEffect(() => () => { clearTimeout(queueTimerRef.current); clearTimeout(ytStateTimer.current) }, [])
 
   // ── YouTube player (kept alive but hidden: audio only) ─────────────────────
   useEffect(() => {
@@ -489,6 +490,9 @@ if (resumeRef.current === undefined) resumeRef.current = readResume()
             setPlayerReady(true)
           },
           onStateChange: (event) => {
+            clearTimeout(ytStateTimer.current)
+            if (event.data === -1) ytStateTimer.current = setTimeout(() => setYtState(-1), 700)
+            else setYtState(event.data)
             if (event.data === 1 || event.data === 3) requestedVideoRef.current = null
             if (event.data === 1) hasPlayedRef.current = true
             const latest = callbacksRef.current
@@ -496,15 +500,11 @@ if (resumeRef.current === undefined) resumeRef.current = readResume()
               latest.onPlaybackChange((state) => ({ ...state, playing: true }), { position: livePosition() })
             }
             if (event.data === 2 && latest.playback.playing && hasPlayedRef.current) {
-              if (document.visibilityState === 'hidden' && Date.now() - userPauseRef.current > 2000) {
-    try { event.target.playVideo() } catch { /* player not ready */ }
-    return
-  }
-  latest.onPlaybackChange((state) => ({ ...state, playing: false }), { position: livePosition() })
-}
+              latest.onPlaybackChange((state) => ({ ...state, playing: false }), { position: livePosition() })
+            }
             if (event.data === 0) {
               try { localStorage.removeItem(RESUME_KEY) } catch { /* storage is optional */ }
-              
+
               // Every device sees the song end. Only advance if the room is still on the song that ended,
               // otherwise a joiner would skip an extra track.
               const endedId = event.target?.getVideoData?.()?.video_id
@@ -562,10 +562,11 @@ if (resumeRef.current === undefined) resumeRef.current = readResume()
       playerRef.current = null
       host?.replaceChildren()
       setPlayerReady(false)
+      setYtState(-1)
     }
   }, [registerPlayer, livePosition])
 
-    // Remember the playhead so a refresh continues from the same spot.
+  // Remember the playhead so a refresh continues from the same spot.
   useEffect(() => {
     if (!playerReady || !currentTrackId) return undefined
     const save = () => {
@@ -596,7 +597,7 @@ if (resumeRef.current === undefined) resumeRef.current = readResume()
 
     try {
       if (player.getVideoData?.()?.video_id !== currentTrackId) {
-                if (requestedVideoRef.current !== currentTrackId) {
+        if (requestedVideoRef.current !== currentTrackId) {
           requestedVideoRef.current = currentTrackId
           hasPlayedRef.current = false
           const resume = resumeRef.current
@@ -632,50 +633,17 @@ if (resumeRef.current === undefined) resumeRef.current = readResume()
     followRoom(player, currentTrackId)
   }, [sync, playerReady, currentTrackId, syncStamp, playbackPlaying, followRoom])
 
-  // Silent looping audio element, played whenever music is playing.
-useEffect(() => {
-  const audio = new Audio(makeSilentWav())
-  audio.loop = true
-  audio.setAttribute('playsinline', '')
-  keepAliveRef.current = audio
-  return () => { audio.pause(); URL.revokeObjectURL(audio.src); keepAliveRef.current = null }
-}, [])
 
-useEffect(() => {
-  const audio = keepAliveRef.current
-  if (!audio) return
-  if (playbackPlaying && currentTrackId) audio.play().catch(() => { /* needs a tap first */ })
-  else audio.pause()
-}, [playbackPlaying, currentTrackId])
 
-// Lock-screen / notification controls show the right play or pause state.
-useEffect(() => {
-  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = playbackPlaying ? 'playing' : 'paused'
-}, [playbackPlaying])
+  // Lock-screen / notification controls show the right play or pause state.
 
-// While the page is hidden, nudge the player back to playing if the phone paused it.
-useEffect(() => {
-  if (!playerReady || !playbackPlaying || !currentTrackId) return undefined
-  const timer = setInterval(() => {
-    if (document.visibilityState !== 'hidden') return
-    if (Date.now() - userPauseRef.current < 2000) return
-    const player = playerRef.current
-    const state = player?.getPlayerState?.()
-    if (state === 2 || state === 5 || state === -1) { try { player.playVideo() } catch { /* player not ready */ } }
-  }, 3000)
-  return () => clearInterval(timer)
-}, [playerReady, playbackPlaying, currentTrackId])
+  useEffect(() => {
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = showPause ? 'playing' : 'paused'
+  }, [showPause])
 
-// Coming back to the page: restart if it stopped while you were away.
-useEffect(() => {
-  const onVisible = () => {
-    if (document.visibilityState !== 'visible' || !playbackPlaying || !currentTrack) return
-    const state = playerRef.current?.getPlayerState?.()
-    if (state !== 1 && state !== 3) requestVideo(currentTrack, true)
-  }
-  document.addEventListener('visibilitychange', onVisible)
-  return () => document.removeEventListener('visibilitychange', onVisible)
-}, [playbackPlaying, currentTrack, requestVideo])
+  
+
+
 
 
   // Room sync 2/2: while playing, quietly correct drift (buffering, background tabs) every few seconds.
@@ -750,64 +718,64 @@ useEffect(() => {
     list.scrollTo({ top: line.offsetTop - list.clientHeight / 2 + line.offsetHeight / 2, behavior: 'smooth' })
   }, [activeLyricIndex, lyricsOpen])
 
-useEffect(() => {
-  if (!currentTrackId || !('mediaSession' in navigator)) return undefined
-  if ('MediaMetadata' in window) {
-    navigator.mediaSession.metadata = new window.MediaMetadata({
-      title: currentTrackTitle,
-      artist: currentTrackArtist,
-      album: 'Jamroom', // shown under the artist on some phones
-      artwork: [
-        { src: `https://i.ytimg.com/vi/${currentTrackId}/mqdefault.jpg`, sizes: '320x180', type: 'image/jpeg' },
-        { src: `https://i.ytimg.com/vi/${currentTrackId}/hqdefault.jpg`, sizes: '480x360', type: 'image/jpeg' },
-      ],
-    })
-  }
-  const jump = (seconds) => {
-    const player = playerRef.current
-    const time = Math.max(0, Number(player?.getCurrentTime?.() || 0) + seconds)
-    try { player?.seekTo?.(time, true) } catch { /* player not ready */ }
-    seekRoom(time)
-  }
-  const actions = {
-    play: () => changePlaying(true),
-    pause: () => changePlaying(false),
-    previoustrack: () => playIndex(playbackCurrent - 1),
-    nexttrack: () => playIndex(nextIndex()),
-    seekbackward: () => jump(-10),
-    seekforward: () => jump(10),
-    seekto: (details) => {
-      try { playerRef.current?.seekTo?.(details.seekTime, true) } catch { /* player not ready */ }
-      seekRoom(details.seekTime)
-    },
-  }
-  for (const [action, handler] of Object.entries(actions)) {
-    try { navigator.mediaSession.setActionHandler(action, handler) } catch { /* unsupported action */ }
-  }
-  return () => {
-    for (const action of Object.keys(actions)) {
-      try { navigator.mediaSession.setActionHandler(action, null) } catch { /* noop */ }
+  useEffect(() => {
+    if (!currentTrackId || !('mediaSession' in navigator)) return undefined
+    if ('MediaMetadata' in window) {
+      navigator.mediaSession.metadata = new window.MediaMetadata({
+        title: currentTrackTitle,
+        artist: currentTrackArtist,
+        album: 'Jamroom', // shown under the artist on some phones
+        artwork: [
+          { src: `https://i.ytimg.com/vi/${currentTrackId}/mqdefault.jpg`, sizes: '320x180', type: 'image/jpeg' },
+          { src: `https://i.ytimg.com/vi/${currentTrackId}/hqdefault.jpg`, sizes: '480x360', type: 'image/jpeg' },
+        ],
+      })
     }
-  }
-}, [currentTrackId, currentTrackTitle, currentTrackArtist, playbackCurrent, changePlaying, playIndex, nextIndex, seekRoom])
+    const jump = (seconds) => {
+      const player = playerRef.current
+      const time = Math.max(0, Number(player?.getCurrentTime?.() || 0) + seconds)
+      try { player?.seekTo?.(time, true) } catch { /* player not ready */ }
+      seekRoom(time)
+    }
+    const actions = {
+      play: () => changePlaying(true),
+      pause: () => changePlaying(false),
+      previoustrack: () => playIndex(playbackCurrent - 1),
+      nexttrack: () => playIndex(nextIndex()),
+      seekbackward: () => jump(-10),
+      seekforward: () => jump(10),
+      seekto: (details) => {
+        try { playerRef.current?.seekTo?.(details.seekTime, true) } catch { /* player not ready */ }
+        seekRoom(details.seekTime)
+      },
+    }
+    for (const [action, handler] of Object.entries(actions)) {
+      try { navigator.mediaSession.setActionHandler(action, handler) } catch { /* unsupported action */ }
+    }
+    return () => {
+      for (const action of Object.keys(actions)) {
+        try { navigator.mediaSession.setActionHandler(action, null) } catch { /* noop */ }
+      }
+    }
+  }, [currentTrackId, currentTrackTitle, currentTrackArtist, playbackCurrent, changePlaying, playIndex, nextIndex, seekRoom])
 
 
-// Keeps the lock-screen progress bar in step with the song.
-useEffect(() => {
-  if (!playerReady || !currentTrackId || !('mediaSession' in navigator) || !navigator.mediaSession.setPositionState) return undefined
-  const update = () => {
-    const player = playerRef.current
-    const duration = Number(player?.getDuration?.())
-    const position = Number(player?.getCurrentTime?.())
-    if (!Number.isFinite(duration) || duration <= 0 || !Number.isFinite(position)) return
-    try {
-      navigator.mediaSession.setPositionState({ duration, position: Math.min(position, duration), playbackRate: 1 })
-    } catch { /* not supported */ }
-  }
-  update()
-  const timer = setInterval(update, 3000)
-  return () => clearInterval(timer)
-}, [playerReady, currentTrackId, playbackPlaying])
+  // Keeps the lock-screen progress bar in step with the song.
+  useEffect(() => {
+    if (!playerReady || !currentTrackId || !('mediaSession' in navigator) || !navigator.mediaSession.setPositionState) return undefined
+    const update = () => {
+      const player = playerRef.current
+      const duration = Number(player?.getDuration?.())
+      const position = Number(player?.getCurrentTime?.())
+      if (!Number.isFinite(duration) || duration <= 0 || !Number.isFinite(position)) return
+      try {
+        navigator.mediaSession.setPositionState({ duration, position: Math.min(position, duration), playbackRate: 1 })
+      } catch { /* not supported */ }
+    }
+    update()
+    const timer = setInterval(update, 3000)
+    return () => clearInterval(timer)
+  }, [playerReady, currentTrackId, playbackPlaying])
 
 
   const offsetLabel = `${lyricOffset > 0 ? '+' : ''}${lyricOffset.toFixed(1)}s`
@@ -821,7 +789,7 @@ useEffect(() => {
   const ToastIcon = modeToast?.icon
   const sleepLabel = `${Math.floor(sleepLeft / 60)}:${String(sleepLeft % 60).padStart(2, '0')}`
   const queueActive = view === 'queue' && !queueExiting
-  
+
   return <>
     {/* The video lives here, off-screen. Only its audio is used. */}
     <div className="yt-host" ref={playerHostRef} aria-hidden="true" />
@@ -835,8 +803,8 @@ useEffect(() => {
         </span>
       </button>
       <button className="icon-btn" onClick={() => playIndex(playbackCurrent - 1)} disabled={!canPrev} aria-label="Previous song"><SkipBack size={17} /></button>
-      <button className="mini-play" onClick={togglePlay} aria-label={playbackPlaying ? 'Pause' : 'Play'}>
-        <span key={playbackPlaying ? 'pause' : 'play'} className="motion-icon">{playbackPlaying ? <Pause size={17} /> : <Play size={17} fill="currentColor" />}</span>
+      <button className="mini-play" onClick={togglePlay} aria-label={showPause ? 'Pause' : 'Play'}>
+        <span key={showPause ? 'pause' : 'play'} className="motion-icon">{showPause ? <Pause size={17} /> : <Play size={17} fill="currentColor" />}</span>
       </button>
       <button className="icon-btn" onClick={() => playIndex(nextIndex())} disabled={!canNext} aria-label="Next song"><SkipForward size={17} /></button>
     </div>}
@@ -866,86 +834,92 @@ useEffect(() => {
 
         {view === 'search'
           ? <SongSearch
-              queuedIds={playbackQueue.map((track) => track.id)}
-              onPlay={onPlayTrack}
-              onQueue={onQueueTrack}
-            />
+            queuedIds={playbackQueue.map((track) => track.id)}
+            onPlay={onPlayTrack}
+            onQueue={onQueueTrack}
+            onPlayNext={onPlayNext}
+          />
           : view === 'queue'
-                        ? <ul ref={queueDrag.listRef} className={`np-queue-list ${queueExiting ? 'np-panel-out' : 'np-panel-in'}`} onWheel={(event) => rubberBandAtBounds(event.currentTarget, event.deltaY)}>
-                {playbackQueue.map((track, index) => <li
-                  className={`${index === playbackCurrent ? 'current' : ''}${queueDrag.dragIndex === index ? ' dragging' : ''}`}
-                  key={track.id}
-                  style={queueDrag.itemStyle(index)}
-                >
-                  <span className="np-drag-handle" {...queueDrag.handleProps(index)} title="Drag to reorder" aria-label={`Drag ${track.title} to reorder`}><GripVertical size={17} /></span>
-                  <button className="np-queue-track" onClick={() => playIndex(index)}>
-                    <img src={track.thumbnail || `https://i.ytimg.com/vi/${track.id}/mqdefault.jpg`} alt="" />
-                    <span><strong>{track.title}</strong><small>{track.artist}</small></span>
-                  </button>
-                  <button className="np-icon small" onClick={() => removeTrack(index)} aria-label={`Remove ${track.title}`}><Trash2 size={15} /></button>
-                </li>)}
-              </ul>
-                        : <div className={`np-body${showLyrics ? '' : ' no-lyrics'}`} onPointerDown={startSwipe}>
-                <div ref={stageRef} className={`np-stage${lyricsFullOn ? ' is-lyrics' : ''}${slideDir ? ` slide-from-${slideDir}` : ''}`}>
-                  {lyricsFullOn
-                    ? <>
-                        <div className="np-lyrics-bar">
-                          <span>Synced lyrics</span>
-                          {lyricLines.length > 0 && <div className="lyric-offset" role="group" aria-label="Adjust lyric timing">
-                            <button onClick={() => nudgeOffset(-OFFSET_STEP)} aria-label="Show lyrics earlier" title="Lyrics late? Show them earlier"><Minus size={13} /></button>
-                            <span
-                              role="button"
-                              tabIndex={0}
-                              title="Lyric timing offset. Click to reset."
-                              onClick={() => saveOffset(0)}
-                              onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); saveOffset(0) } }}
-                            >{offsetLabel}</span>
-                            <button onClick={() => nudgeOffset(OFFSET_STEP)} aria-label="Show lyrics later" title="Lyrics early? Show them later"><Plus size={13} /></button>
-                          </div>}
-                        </div>
-                        {lyricsLoading && <p className="np-lyrics-note"><Loader size={15} className="spin" /> Loading lyrics…</p>}
-                        {!lyricsLoading && lyricsError && <p className="np-lyrics-note">{lyricsError}</p>}
-                        {!lyricsLoading && !lyricsError && <div className="np-lyrics-list" ref={lyricsListRef} onWheel={(event) => rubberBandAtBounds(event.currentTarget, event.deltaY)}>
-                          {lyricLines.map((line, index) => <p
-                            key={`${line.time}-${index}`}
-                            ref={(element) => { lyricLineRefs.current[index] = element }}
-                            className={index === activeLyricIndex ? 'current' : ''}
-                          >{line.text || '♪'}</p>)}
-                        </div>}
-                      </>
-                    : <img key={currentTrackId} className="np-art" src={art} alt="" draggable={false} />}
-                </div>
+            ? <ul ref={queueDrag.listRef} className={`np-queue-list ${queueExiting ? 'np-panel-out' : 'np-panel-in'}`} onWheel={(event) => rubberBandAtBounds(event.currentTarget, event.deltaY)}>
+              {playbackQueue.map((track, index) => <li
+                className={`${index === playbackCurrent ? 'current' : ''}${queueDrag.dragIndex === index ? ' dragging' : ''}`}
+                key={track.id}
+                style={queueDrag.itemStyle(index)}
+              >
+                <span className="np-drag-handle" {...queueDrag.handleProps(index)} title="Drag to reorder" aria-label={`Drag ${track.title} to reorder`}><GripVertical size={17} /></span>
+                <button className="np-queue-track" onClick={() => playIndex(index)}>
+                  <img src={track.thumbnail || `https://i.ytimg.com/vi/${track.id}/mqdefault.jpg`} alt="" />
+                  <span><strong>{track.title}</strong><small>{track.artist}</small></span>
+                </button>
+                <button className="np-icon small" onClick={() => onPlaybackChange((state) => playNext(state, track))}
+                  disabled={index === playbackCurrent || index === playbackCurrent + 1}
+                  aria-label={`Play ${track.title} next`} title="Play next"><ListStart size={15} /></button>
+                <button className="np-icon small" onClick={() => removeTrack(index)} aria-label={`Remove ${track.title}`}><Trash2 size={15} /></button>
 
-                {showLyrics && <div className="np-pager" role="group" aria-label="Cover or lyrics">
-                  <button className={!lyricsFullOn ? 'on' : ''} onClick={() => showPage(false)} aria-label="Show cover art" />
-                  <button className={lyricsFullOn ? 'on' : ''} onClick={() => showPage(true)} aria-label="Show lyrics" />
-                </div>}
+              </li>)}
+            </ul>
+            : <div className={`np-body${showLyrics ? '' : ' no-lyrics'}`} onPointerDown={startSwipe}>
+              <div ref={stageRef} className={`np-stage${lyricsFullOn ? ' is-lyrics' : ''}${slideDir ? ` slide-from-${slideDir}` : ''}`}>
+                {lyricsFullOn
+                  ? <>
+                    <div className="np-lyrics-bar">
+                      <span>Synced lyrics</span>
+                      {lyricLines.length > 0 && <div className="lyric-offset" role="group" aria-label="Adjust lyric timing">
+                        <button onClick={() => nudgeOffset(-OFFSET_STEP)} aria-label="Show lyrics earlier" title="Lyrics late? Show them earlier"><Minus size={13} /></button>
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          title="Lyric timing offset. Click to reset."
+                          onClick={() => saveOffset(0)}
+                          onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); saveOffset(0) } }}
+                        >{offsetLabel}</span>
 
-                                <div className="np-title-row">
-                  <div className="np-title">
-                    <strong title={currentTrack.title}>{currentTrack.title}</strong>
-                    <small>{currentTrack.artist}</small>
-                  </div>
-                  <button
-                    className={`icon-btn np-lyrics-toggle${showLyrics ? ' active' : ''}`}
-                    onClick={toggleLyrics}
-                    aria-pressed={showLyrics}
-                    aria-label={showLyrics ? 'Turn lyrics off' : 'Turn lyrics on'}
-                    title={showLyrics ? 'Lyrics on' : 'Lyrics off'}
-                  >{showLyrics ? <Mic2 size={17} /> : <MicOff size={17} />}</button>
-                  <AddToPlaylist track={currentTrack} />
-                </div>
+                        <button onClick={() => nudgeOffset(OFFSET_STEP)} aria-label="Show lyrics later" title="Lyrics early? Show them later"><Plus size={13} /></button>
+                      </div>}
+                    </div>
+                    {lyricsLoading && <p className="np-lyrics-note"><Loader size={15} className="spin" /> Loading lyrics…</p>}
+                    {!lyricsLoading && lyricsError && <p className="np-lyrics-note">{lyricsError}</p>}
+                    {!lyricsLoading && !lyricsError && <div className="np-lyrics-list" ref={lyricsListRef} onWheel={(event) => rubberBandAtBounds(event.currentTarget, event.deltaY)}>
+                      {lyricLines.map((line, index) => <p
+                        key={`${line.time}-${index}`}
+                        ref={(element) => { lyricLineRefs.current[index] = element }}
+                        className={index === activeLyricIndex ? 'current' : ''}
+                      >{line.text || '♪'}</p>)}
+                    </div>}
+                  </>
+                  : <img key={currentTrackId} className="np-art" src={art} alt="" draggable={false} />}
+              </div>
 
-                {showLyrics && !lyricsFullOn && <div className="np-lyric-window" aria-live="off">
-                  {lyricsLoading
-                    ? <p className="current"><Loader size={15} className="spin" /> Loading lyrics…</p>
-                    : lyricsError
-                      ? <p>{lyricsError}</p>
-                      : windowLines.map((text, slot) => <p key={`${activeLyricIndex}:${slot}`} className={slot === 1 ? 'current' : ''}>{text}</p>)}
-                </div>}
-
-                <ProgressBar key={currentTrackId} playerRef={playerRef} fallbackDuration={currentTrackDuration} onSeek={seekRoom} />
+              {showLyrics && <div className="np-pager" role="group" aria-label="Cover or lyrics">
+                <button className={!lyricsFullOn ? 'on' : ''} onClick={() => showPage(false)} aria-label="Show cover art" />
+                <button className={lyricsFullOn ? 'on' : ''} onClick={() => showPage(true)} aria-label="Show lyrics" />
               </div>}
+
+              <div className="np-title-row">
+                <div className="np-title">
+                  <strong title={currentTrack.title}>{currentTrack.title}</strong>
+                  <small>{currentTrack.artist}</small>
+                </div>
+                <button
+                  className={`icon-btn np-lyrics-toggle${showLyrics ? ' active' : ''}`}
+                  onClick={toggleLyrics}
+                  aria-pressed={showLyrics}
+                  aria-label={showLyrics ? 'Turn lyrics off' : 'Turn lyrics on'}
+                  title={showLyrics ? 'Lyrics on' : 'Lyrics off'}
+                >{showLyrics ? <Mic2 size={17} /> : <MicOff size={17} />}</button>
+                <AddToPlaylist track={currentTrack} />
+              </div>
+
+              {showLyrics && !lyricsFullOn && <div className="np-lyric-window" aria-live="off">
+                {lyricsLoading
+                  ? <p className="current"><Loader size={15} className="spin" /> Loading lyrics…</p>
+                  : lyricsError
+                    ? <p>{lyricsError}</p>
+                    : windowLines.map((text, slot) => <p key={`${activeLyricIndex}:${slot}`} className={slot === 1 ? `current${text.length > 70 ? ' long' : ''}` : ''}>{text}</p>)}
+              </div>}
+
+              <ProgressBar key={currentTrackId} playerRef={playerRef} fallbackDuration={currentTrackDuration} onSeek={seekRoom} />
+            </div>}
 
         <footer className="np-controls">
           <button
@@ -954,8 +928,8 @@ useEffect(() => {
             aria-label={`${MODES[mode].label}. Tap to change playback mode`}
           ><ModeIcon size={17} /></button>
           <button className="np-icon" onClick={() => playIndex(playbackCurrent - 1)} disabled={!canPrev} aria-label="Previous song"><SkipBack size={22} fill="currentColor" /></button>
-          <button className="np-play" onClick={togglePlay} aria-label={playbackPlaying ? 'Pause' : 'Play'}>
-            <span key={playbackPlaying ? 'pause' : 'play'} className="motion-icon">{playbackPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}</span>
+          <button className="np-play" onClick={togglePlay} aria-label={showPause ? 'Pause' : 'Play'}>
+            <span key={showPause ? 'pause' : 'play'} className="motion-icon">{showPause ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}</span>
           </button>
           <button className="np-icon" onClick={() => playIndex(nextIndex())} disabled={!canNext} aria-label="Next song"><SkipForward size={22} fill="currentColor" /></button>
           <button className={`np-circle${queueActive ? ' active' : ''}`} onClick={toggleQueue} aria-label="Queue" aria-pressed={queueActive}><ListMusic size={17} /></button>
@@ -970,25 +944,25 @@ useEffect(() => {
           <div className="np-menu" role="menu">
             {menuPage === 'timer'
               ? <>
-                  <button role="menuitem" onClick={() => setMenuPage('main')}><ArrowLeft size={16} /> Sleep timer</button>
-                  {SLEEP_OPTIONS.map((minutes) => <button key={minutes} role="menuitem" onClick={() => startSleep(minutes)}>
-                    <Timer size={16} /> {minutes} minutes
-                  </button>)}
-                  {sleepEnd && <button role="menuitem" onClick={cancelSleep}><TimerOff size={16} /> Turn off timer</button>}
-                </>
+                <button role="menuitem" onClick={() => setMenuPage('main')}><ArrowLeft size={16} /> Sleep timer</button>
+                {SLEEP_OPTIONS.map((minutes) => <button key={minutes} role="menuitem" onClick={() => startSleep(minutes)}>
+                  <Timer size={16} /> {minutes} minutes
+                </button>)}
+                {sleepEnd && <button role="menuitem" onClick={cancelSleep}><TimerOff size={16} /> Turn off timer</button>}
+              </>
               : <>
-                  <button role="menuitem" onClick={() => { setView('search'); setMenuOpen(false) }}><Search size={16} /> Add music</button>
-                  <button role="menuitem" onClick={() => setMenuPage('timer')}>
-                    <Timer size={16} /> Sleep timer {sleepEnd && <small>{sleepLabel}</small>}
-                  </button>
-          
-                  {user
-                    ? <>
-                        <button role="menuitem" onClick={() => go('playlists')}><Disc3 size={16} /> My playlists</button>
-                        <button role="menuitem" onClick={() => go('settings')}><Settings size={16} /> Settings</button>
-                      </>
-                    : <button role="menuitem" onClick={() => { collapse(); openAuth('login') }}><LogIn size={16} /> Log in to save music</button>}
-                </>}
+                <button role="menuitem" onClick={() => { setView('search'); setMenuOpen(false) }}><Search size={16} /> Add music</button>
+                <button role="menuitem" onClick={() => setMenuPage('timer')}>
+                  <Timer size={16} /> Sleep timer {sleepEnd && <small>{sleepLabel}</small>}
+                </button>
+
+                {user
+                  ? <>
+                    <button role="menuitem" onClick={() => go('playlists')}><Disc3 size={16} /> My playlists</button>
+
+                  </>
+                  : <button role="menuitem" onClick={() => { collapse(); openAuth('login') }}><LogIn size={16} /> Log in to save music</button>}
+              </>}
           </div>
         </>}
       </section>
@@ -1064,7 +1038,7 @@ function findLyricIndex(lines, currentTime) {
   return result
 }
 
-function SongSearch({ queuedIds, onPlay, onQueue }) {
+function SongSearch({ queuedIds, onPlay, onQueue, onPlayNext }) {
   const [query, setQuery] = useState('')
   const [state, setState] = useState({ query: '', results: [], searching: false, error: '' })
   const q = query.trim()
@@ -1111,6 +1085,7 @@ function SongSearch({ queuedIds, onPlay, onQueue }) {
             <img src={track.thumbnail} alt="" />
             <span><strong>{track.title}</strong><small>{track.artist}</small></span>
           </button>
+          <button className="np-icon small" onClick={() => onPlayNext?.(track)} aria-label={`Play ${track.title} next`} title="Play next"><ListStart size={16} /></button>
           <button className="np-icon small" onClick={(event) => !queued && onQueue?.(track, event.currentTarget)} disabled={queued} aria-label={queued ? `${track.title} is in the queue` : `Add ${track.title} to queue`}>
             {queued ? <Check size={16} /> : <Plus size={17} />}
           </button>

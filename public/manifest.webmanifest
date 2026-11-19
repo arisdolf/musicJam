@@ -1,6 +1,6 @@
 {
-  "name": "Jamroom",
-  "short_name": "Jamroom",
+  "name": "meloJam",
+  "short_name": "meloJam",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0a0b",

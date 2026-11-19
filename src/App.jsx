@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { FriendsProvider } from './features/friends/FriendsContext'
-
+import { getSimilarTracks } from './services/youtube'
 import InviteToasts from './components/InviteToasts'
 import { AccountProvider } from './features/account/AccountContext'
 import { PlaybackProvider, usePlayback } from './features/playback/PlaybackContext'
@@ -12,14 +12,15 @@ import AuthModal from './components/AuthModal'
 import JoinRoom from './components/JoinRoom'
 import MusicRoom from './components/MusicRoom'
 import Playlists from './pages/Playlists'
-
+import { playNow, replaceQueue, playNext } from './utils/queue'
+import { TopbarProvider } from './components/TopBarContext'
 import RecentRooms from './pages/RecentRooms'
 import Settings from './pages/Settings'
 import PersistentPlayer from './components/PersistentPlayer'
 import QueueFly from './components/QueueFly'
 import { useAccount } from './features/account/AccountContext'
 import ErrorBoundary from './components/ErrorBoundary'
-import { playNow, replaceQueue } from './utils/queue'
+
 // ── Inner shell (needs AccountContext) ────────────────────────────────────────
 function Shell() {
   const { user } = useAccount()
@@ -31,12 +32,12 @@ function Shell() {
     playTracks: playLocalTracks,
     startVideo,
   } = usePlayback()
-  const [view, setView]           = useState('home')   // 'home'|'playlists'|'quota'|'recent'|'settings'
-  const [roomCode, setRoomCode]   = useState(() => new URLSearchParams(window.location.search).get('room')?.toUpperCase() || '')
- const [settingsSection, setSettingsSection] = useState(null) // null | 'friends' | 'quota'
-  const [queueFly, setQueueFly]   = useState(null)
+  const [view, setView] = useState('home')   // 'home'|'playlists'|'quota'|'recent'|'settings'
+  const [roomCode, setRoomCode] = useState(() => new URLSearchParams(window.location.search).get('room')?.toUpperCase() || '')
+  const [settingsSection, setSettingsSection] = useState(null) // null | 'friends' | 'quota'
+  const [queueFly, setQueueFly] = useState(null)
   const queueFlyCounter = useRef(0)
-const openFriends = useCallback(() => { setSettingsSection('friends'); setView('settings') }, [])
+  const openFriends = useCallback(() => { setSettingsSection('friends'); setView('settings') }, [])
   const { room, updateRoom, connection, members, serverNow } = useRoom(roomCode)
   const roomQueue = room.queue
   const roomCurrent = room.current
@@ -48,14 +49,14 @@ const openFriends = useCallback(() => { setSettingsSection('friends'); setView('
     window.history.pushState({}, '', url)
     setRoomCode(code)
   }, [])
-  
+
   const joinRoom = useCallback((code) => {
     setView('home')
     setUrlRoom(code)
   }, [setUrlRoom])
 
-  
-    // Clicking a system notification: join the invited room, or open Friends.
+
+  // Clicking a system notification: join the invited room, or open Friends.
   useEffect(() => {
     const open = (detail) => {
       if (detail?.roomCode) joinRoom(detail.roomCode)
@@ -71,7 +72,7 @@ const openFriends = useCallback(() => { setSettingsSection('friends'); setView('
     }
   }, [joinRoom, openFriends])
 
-  
+
   const leaveRoom = useCallback(() => {
     if (!roomQueue.length) {
       setUrlRoom('')
@@ -90,10 +91,10 @@ const openFriends = useCallback(() => { setSettingsSection('friends'); setView('
     setUrlRoom('')
   }, [updateLocalPlayback, localPlaybackState.queue, roomQueue, roomCurrent, roomPlaying, setUrlRoom])
 
-const navigate = useCallback((id) => {
-  if (id === 'settings') setSettingsSection(null)
-  if (id !== view) setView(id)
-}, [view])
+  const navigate = useCallback((id) => {
+    if (id === 'settings') setSettingsSection(null)
+    if (id !== view) setView(id)
+  }, [view])
 
   const roomPlaybackActive = Boolean(roomCode && roomQueue.length)
   const playbackState = roomPlaybackActive ? room : localPlaybackState
@@ -125,12 +126,14 @@ const navigate = useCallback((id) => {
     setQueueFly((current) => current?.key === key ? null : current)
   }, [])
 
-   const playTrack = useCallback((track) => {
+  const playTrack = useCallback((track) => {
     if (!track?.id) return
     if (!roomCode) { playLocalTrack(track); return }
     updateRoom((state) => playNow(state, [track]))
     startVideo(track.id)
   }, [roomCode, updateRoom, playLocalTrack, startVideo])
+
+
 
   const queueTracks = useCallback((tracks) => {
     const list = (Array.isArray(tracks) ? tracks : []).filter((track) => track?.id)
@@ -145,6 +148,16 @@ const navigate = useCallback((id) => {
     })
   }, [roomCode, updateRoom, addLocalTrack])
 
+  const playNextTrack = useCallback((track) => {
+    if (!track?.id) return
+    if (!roomCode) { updateLocalPlayback((state) => playNext(state, track)); return }
+    updateRoom((state) => playNext(state, track))
+  }, [roomCode, updateRoom, updateLocalPlayback])
+
+  const fallbackTitle = roomCode && view === 'home'
+    ? `Room ${roomCode}`
+    : ({ home: 'Home', playlists: 'Playlists', recent: 'Recent rooms', settings: 'Settings' }[view] || '')
+
   const queueTrack = useCallback((track, trigger) => {
     if (!track?.id) return
     animateQueueAdd(track, trigger)
@@ -157,61 +170,74 @@ const navigate = useCallback((id) => {
       : { ...state, queue: [...state.queue, track], current: state.queue.length ? state.current : 0 })
   }, [roomCode, updateRoom, addLocalTrack, animateQueueAdd])
 
- const playTracks = useCallback((tracks, index = 0) => {
-  if (!roomCode) { playLocalTracks(tracks, index); return }
-  if (!tracks[index]?.id) return
-  updateRoom((state) => replaceQueue(state, tracks, index))
-  startVideo(tracks[index].id)
-}, [roomCode, updateRoom, playLocalTracks, startVideo])
+  const playTracks = useCallback((tracks, index = 0) => {
+    if (!roomCode) { playLocalTracks(tracks, index); return }
+    if (!tracks[index]?.id) return
+    updateRoom((state) => replaceQueue(state, tracks, index))
+    startVideo(tracks[index].id)
+  }, [roomCode, updateRoom, playLocalTracks, startVideo])
 
-  const renderContent = () => {
+// Plays this song (queued first, existing queue kept), then adds up to 25 similar songs at the end.
+const playWithSimilar = useCallback(async (track) => {
+  if (!track?.id) return
+  playTrack(track)
+  try {
+    const similar = await getSimilarTracks(track)
+    queueTracks(similar.slice(0, 25))
+  } catch { /* the song is already playing; recommendations are a bonus */ }
+}, [playTrack, queueTracks])
+
+const renderContent = () => {
     if (roomCode && view === 'home') {
-      return <MusicRoom roomCode={roomCode} room={room} updateRoom={updateRoom} connection={connection} members={members} onLeave={leaveRoom} onPlayTrack={playTrack} onQueueTrack={queueTrack} onPlayTracks={playTracks} onQueueTracks={queueTracks} />
+      
+      return <MusicRoom roomCode={roomCode} room={room} updateRoom={updateRoom} connection={connection} members={members} onLeave={leaveRoom} onPlayTrack={playTrack} onQueueTrack={queueTrack} onPlayTracks={playTracks} onQueueTracks={queueTracks} onPlayNext={playNextTrack} />
     }
+    
     switch (view) {
       case 'playlists': return <Playlists onBrowse={() => navigate('home')} onPlayTracks={playTracks} onQueueTrack={queueTrack} />
-      
-      case 'recent':    return <RecentRooms onJoin={joinRoom} />
-       
-      case 'settings':  return user ? <Settings roomCode={roomCode} section={settingsSection} onSectionChange={setSettingsSection} /> : null
-      default:          return <JoinRoom onJoin={joinRoom} />
+
+      case 'recent': return <RecentRooms onJoin={joinRoom} />
+
+      case 'settings': return user ? <Settings roomCode={roomCode} section={settingsSection} onSectionChange={setSettingsSection} /> : null
+      default: return <JoinRoom onJoin={joinRoom} onPlaySong={playWithSimilar} onQueueTrack={queueTrack} />
     }
   }
 
   return (
-  <div className={`app-shell${playbackState.queue.length ? ' has-player' : ''}`}>
-    <Sidenav view={view} onNavigate={navigate} />
+    <div className={`app-shell${playbackState.queue.length ? ' has-player' : ''}`}>
+      <Sidenav view={view} onNavigate={navigate} />
 
-    <div className="app-content">
-      <Topbar />
-      <ErrorBoundary label="The player">
-        <PersistentPlayer
-          playback={playbackState}
-          onPlaybackChange={updateActivePlayback}
-          onNavigate={navigate}
-          onPlayTrack={playTrack}
-          onQueueTrack={queueTrack}
-          sync={sync}
-        />
-      </ErrorBoundary>
+      <div className="app-content">
+        <Topbar fallbackTitle={fallbackTitle} />
+        <ErrorBoundary label="The player">
+          <PersistentPlayer
+            playback={playbackState}
 
-      <QueueFly motion={queueFly} onComplete={completeQueueFly} />
-      <div className="app-body">
-        <ErrorBoundary label="This page" resetKey={`${view}:${roomCode || 'local'}`}>
-          <div className="route-stage" key={`${view}:${roomCode || 'local'}`}>
-            {renderContent()}
-          </div>
+            onPlaybackChange={updateActivePlayback}
+            onNavigate={navigate}
+            onPlayTrack={playTrack}
+            onQueueTrack={queueTrack}
+            sync={sync}
+            onPlayNext={playNextTrack} />
         </ErrorBoundary>
-      </div>
-      <BottomNav view={view} onNavigate={navigate} />
-    </div>
 
-    <InviteToasts onJoin={joinRoom} onOpenFriends={openFriends} />
-    <AuthModal />
-  </div>
-)
+        <QueueFly motion={queueFly} onComplete={completeQueueFly} />
+        <div className="app-body">
+          <ErrorBoundary label="This page" resetKey={`${view}:${roomCode || 'local'}`}>
+            <div className="route-stage" key={`${view}:${roomCode || 'local'}`}>
+              {renderContent()}
+            </div>
+          </ErrorBoundary>
+        </div>
+        <BottomNav view={view} onNavigate={navigate} />
+      </div>
+
+      <InviteToasts onJoin={joinRoom} onOpenFriends={openFriends} />
+      <AuthModal />
+    </div>
+  )
 }
 
 export default function App() {
-  return  <AccountProvider><FriendsProvider><PlaybackProvider><Shell /></PlaybackProvider></FriendsProvider></AccountProvider>
+  return <AccountProvider><FriendsProvider><PlaybackProvider><TopbarProvider><Shell /></TopbarProvider></PlaybackProvider></FriendsProvider></AccountProvider>
 }

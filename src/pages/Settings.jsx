@@ -2,13 +2,13 @@
   import { useState } from 'react'
   import UsernameForm from '../components/UsernameForm'
   import { useAccount } from '../features/account/AccountContext'
- import { User, Lock, LogOut, Trash2, Check, Monitor, AtSign, Sun, Moon, Gauge, Users, Bell, ChevronRight, ArrowLeft } from 'lucide-react'
+ import { User, Lock, LogOut, Trash2, Check, Monitor, AtSign, Sun, Moon, Gauge, Users, Bell, ChevronRight } from 'lucide-react'
 import Quota from './Quota'
 import Friends from './Friends'
 import { useFriends } from '../features/friends/FriendsContext'
 import { getTheme, applyTheme } from '../utils/theme'
 import { ensureNotificationPermission } from '../utils/notify'
-
+import { useTopbar } from '../components/TopBarContext'
 // ADJUST these to match the routes in your server's auth file.
 const THEMES = [
   { id: 'light',  label: 'Light',  icon: Sun },
@@ -21,7 +21,7 @@ export default function Settings({ roomCode, section, onSectionChange }) {
   const [notifPerm, setNotifPerm] = useState(() => 'Notification' in window ? Notification.permission : 'unsupported')
   const chooseTheme = (mode) => { setTheme(mode); applyTheme(mode) }
   const { user, logOut, updateName, changePassword, deleteAccount } = useAccount()
-  
+  useTopbar(section === 'friends' ? 'Friends' : section === 'quota' ? 'API Quota' : '', section ? () => onSectionChange(null) : null)
   const [name, setName]           = useState(user?.name || '')
   const [nameSaved, setNameSaved] = useState(false)
   const [nameErr, setNameErr]     = useState('')
@@ -69,7 +69,6 @@ export default function Settings({ roomCode, section, onSectionChange }) {
 }
   if (section === 'friends' || section === 'quota') {
     return <div className="settings-page settings-sub">
-      <button className="btn btn-text settings-back" onClick={() => onSectionChange(null)}><ArrowLeft size={16} /> Settings</button>
       {section === 'friends' ? <Friends roomCode={roomCode} /> : <Quota />}
     </div>
   }
