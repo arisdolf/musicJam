@@ -7,6 +7,7 @@ import { PlaybackProvider, usePlayback } from './features/playback/PlaybackConte
 import { useRoom } from './features/rooms/useRoom'
 import Topbar from './components/Topbar'
 import Sidenav from './components/Sidenav'
+import Home from './pages/Home'
 import BottomNav from './components/BottomNav'
 import AuthModal from './components/AuthModal'
 import JoinRoom from './components/JoinRoom'
@@ -156,7 +157,7 @@ function Shell() {
 
   const fallbackTitle = roomCode && view === 'home'
     ? `Room ${roomCode}`
-    : ({ home: 'Home', playlists: 'Playlists', recent: 'Recent rooms', settings: 'Settings' }[view] || '')
+    : ({ home: 'Home', create: 'Create room', playlists: 'Playlists', recent: 'Recent rooms', settings: 'Settings' }[view] || '')
 
   const queueTrack = useCallback((track, trigger) => {
     if (!track?.id) return
@@ -194,13 +195,12 @@ const renderContent = () => {
     }
     
     switch (view) {
-      case 'playlists': return <Playlists onBrowse={() => navigate('home')} onPlayTracks={playTracks} onQueueTrack={queueTrack} />
-
-      case 'recent': return <RecentRooms onJoin={joinRoom} />
-
-      case 'settings': return user ? <Settings roomCode={roomCode} section={settingsSection} onSectionChange={setSettingsSection} /> : null
-      default: return <JoinRoom onJoin={joinRoom} onPlaySong={playWithSimilar} onQueueTrack={queueTrack} />
-    }
+  case 'create': return <JoinRoom onJoin={joinRoom} />
+  case 'playlists': return <Playlists onBrowse={() => navigate('home')} onPlayTracks={playTracks} onQueueTrack={queueTrack} />
+  case 'recent': return <RecentRooms onJoin={joinRoom} />
+  case 'settings': return user ? <Settings roomCode={roomCode} section={settingsSection} onSectionChange={setSettingsSection} /> : null
+  default: return <Home onPlaySong={playWithSimilar} onQueueTrack={queueTrack} onPlayTracks={playTracks} />
+}
   }
 
   return (
@@ -209,6 +209,7 @@ const renderContent = () => {
 
       <div className="app-content">
         <Topbar fallbackTitle={fallbackTitle} />
+        
         <ErrorBoundary label="The player">
           <PersistentPlayer
             playback={playbackState}

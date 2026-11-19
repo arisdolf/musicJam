@@ -7,6 +7,8 @@ import ConfirmModal from './ConfirmModal'
 import { useDragReorder } from '../hooks/useDragReorder'
 import InviteFriendsModal from './InviteFriendsModal'
 import { useTopbar } from './TopBarContext'
+import LikeButton from './LikeButton'
+import TrackMenu, { DotsMenu } from './TrackMenu'
 import { Play, Search, Music2, Check, X, Plus, GripVertical, ListMusic, ListPlus, ChevronDown, LogOut, UserPlus, Sparkles, ListStart } from 'lucide-react'
 
 export default function MusicRoom({ roomCode, room, updateRoom, connection, members, onLeave, onPlayTrack, onQueueTrack, onPlayTracks, onQueueTracks, onPlayNext }) {
@@ -24,6 +26,8 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
   const [savingQueue, setSavingQueue] = useState(false)
   const [feedback, setFeedback] = useState('')
   const [leaveOpen, setLeaveOpen] = useState(false)
+  const [clearOpen, setClearOpen] = useState(false)
+  const clearQueue = () => updateRoom((state) => ({ ...state, queue: [], current: 0, playing: false }))
   useTopbar(`Room ${roomCode}`, () => setLeaveOpen(true))
   const normalizedQuery = query.trim()
   const searchHasResult = searchState.query === normalizedQuery
@@ -186,7 +190,12 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
     <section className="block">
       <div className="block-head">
         <h2>Up next <small className="muted">{room.queue.length} {room.queue.length === 1 ? 'song' : 'songs'}</small></h2>
-        {room.queue.length > 0 && <button className="btn btn-small" onClick={() => { if (!user) { openAuth('signup'); return } setSaveModalOpen(true) }}>{saved ? <><Check size={14} /> Saved</> : <><Music2 size={14} /> Save as playlist</>}</button>}
+        {room.queue.length > 0 && <div className="block-head-actions">
+          <button className="btn btn-small" onClick={() => { if (!user) { openAuth('signup'); return } setSaveModalOpen(true) }}>{saved ? <><Check size={14} /> Saved</> : <><Music2 size={14} /> Save as playlist</>}</button>
+          <DotsMenu label="Queue options" items={[
+            { label: 'Remove all tracks', icon: <Trash2 size={16} />, danger: true, onClick: () => setClearOpen(true) },
+          ]} />
+        </div>}
       </div>
       {room.queue.length === 0
         ? <p className="empty">Songs you add will show up here.</p>
@@ -201,13 +210,17 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
               <span className="queue-drag-handle" {...queueDrag.handleProps(index)} title="Drag to reorder" aria-label={`Drag ${track.title} to reorder`}><GripVertical size={17} /></span>
               <button className={`queue-thumb${isCurrent ? ' is-playing' : ''}`} onClick={() => onPlayTrack(track)} aria-label={`Play ${track.title}`}>
                 <img src={track.thumbnail} alt="" />
-                {isCurrent && <span className="eq-bars" aria-hidden="true" />}
+                {isCurrent && <span className={`eq-bars${room.playing ? '' : ' paused'}`} aria-hidden="true"><i /><i /><i /></span>}
               </button>
               <button className="track-text as-button" onClick={() => onPlayTrack(track)}><strong>{track.title}</strong><small>{track.artist}</small></button>
               <div className="queue-actions">
-                <button className="icon-btn" onClick={() => onPlayNext(track)} disabled={isCurrent || index === room.current + 1} aria-label={`Play ${track.title} next`} title="Play next"><ListStart size={16} /></button>
-                <AddToPlaylist track={track} />
-                <button className="icon-btn" aria-label={`Remove ${track.title}`} title="Remove" onClick={() => removeTrack(index)}><X size={16} /></button>
+                <LikeButton track={track} />
+                <TrackMenu
+                  track={track}
+                  playNextDisabled={isCurrent || index === room.current + 1}
+                  onPlayNext={() => onPlayNext(track)}
+                  onRemove={() => removeTrack(index)}
+                />
               </div>
             </li>
           })}
@@ -236,6 +249,13 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
       danger={false}
       onCancel={() => setLeaveOpen(false)}
       onConfirm={() => { setLeaveOpen(false); onLeave() }}
+    />}
+    {clearOpen && <ConfirmModal
+      title="Remove all tracks?"
+      message="This clears the whole queue for everyone in the room."
+      confirmLabel="Remove all"
+      onCancel={() => setClearOpen(false)}
+      onConfirm={() => { setClearOpen(false); clearQueue() }}
     />}
   </main>
 }

@@ -7,6 +7,9 @@ import AddToPlaylist from './AddToPlaylist'
 import { useDragReorder } from '../hooks/useDragReorder'
 import { searchYouTube } from '../services/youtube'
 import { playNext } from '../utils/queue'
+import LikeButton from './LikeButton'
+import TrackMenu from './TrackMenu'
+import ConfirmModal from './ConfirmModal'
 import {
   ArrowLeft, Check, ChevronDown, Disc3, GripVertical, ListMusic, ListOrdered, Loader, LogIn, Mic2, MicOff, Minus, MoreVertical,
   Pause, Play, Plus, Repeat1, Search, Shuffle, SkipBack, SkipForward, Timer, TimerOff, Trash2, ListStart
@@ -99,6 +102,7 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
   const [sleepLeft, setSleepLeft] = useState(0)     // seconds remaining
   const [queueExiting, setQueueExiting] = useState(false)
   const playerHostRef = useRef(null)
+  const [clearOpen, setClearOpen] = useState(false)
   const playerRef = useRef(null)
   const requestedVideoRef = useRef(null)
   const hasPlayedRef = useRef(false)
@@ -396,6 +400,18 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
     return { ...state, queue, current, playing: queue.length ? state.playing : false }
   }), [onPlaybackChange])
 
+  const clearQueue = () => {
+    setClearOpen(false)
+    onPlaybackChange((state) => ({ ...state, queue: [], current: 0, playing: false }))
+  }
+
+  useEffect(() => {
+    if (!playerReady || currentTrackId) return
+    try { playerRef.current?.stopVideo?.() } catch { /* not ready */ }
+    collapse()
+  }, [playerReady, currentTrackId, collapse])
+
+
   const moveTrack = useCallback((from, to) => onPlaybackChange((state) => {
     if (from === to || from < 0 || to < 0 || from >= state.queue.length || to >= state.queue.length) return state
     const currentId = state.queue[state.current]?.id
@@ -406,6 +422,15 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
   }), [onPlaybackChange])
   const queueDrag = useDragReorder(moveTrack)
 
+  // Queue view: keep the current song near the top, with the previous song above it.
+  useEffect(() => {
+    if (view !== 'queue') return
+    const list = queueDrag.listRef.current
+    const row = list?.children[Math.max(0, playbackCurrent - 1)]
+    if (!list || !row) return
+    const top = list.scrollTop + row.getBoundingClientRect().top - list.getBoundingClientRect().top
+    list.scrollTo({ top, behavior: 'smooth' })
+  }, [view, playbackCurrent, queueDrag.listRef])
 
   const saveOffset = (next) => {
     if (!currentTrackId) return
@@ -613,14 +638,6 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
       console.warn('YouTube player is not ready yet:', error)
     }
 
-    if (!playbackPlaying) return undefined
-    const timer = setTimeout(() => {
-      const state = player.getPlayerState?.()
-      if (state !== 1 && state !== 3) {
-        try { player.playVideo?.() } catch { /* player went away */ }
-      }
-    }, 1200)
-    return () => clearTimeout(timer)
   }, [currentTrackId, playbackPlaying, playerReady, syncTarget])
 
   // Room sync 1/2: whenever anyone plays, pauses, seeks or changes song, jump to the shared position.
@@ -641,7 +658,7 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = showPause ? 'playing' : 'paused'
   }, [showPause])
 
-  
+
 
 
 
@@ -851,10 +868,13 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
                   <img src={track.thumbnail || `https://i.ytimg.com/vi/${track.id}/mqdefault.jpg`} alt="" />
                   <span><strong>{track.title}</strong><small>{track.artist}</small></span>
                 </button>
-                <button className="np-icon small" onClick={() => onPlaybackChange((state) => playNext(state, track))}
-                  disabled={index === playbackCurrent || index === playbackCurrent + 1}
-                  aria-label={`Play ${track.title} next`} title="Play next"><ListStart size={15} /></button>
-                <button className="np-icon small" onClick={() => removeTrack(index)} aria-label={`Remove ${track.title}`}><Trash2 size={15} /></button>
+                <LikeButton track={track} />
+                <TrackMenu
+                  track={track}
+                  playNextDisabled={index === playbackCurrent || index === playbackCurrent + 1}
+                  onPlayNext={() => onPlaybackChange((state) => playNext(state, track))}
+                  onRemove={() => removeTrack(index)}
+                />
 
               </li>)}
             </ul>
@@ -944,6 +964,7 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
           <div className="np-menu" role="menu">
             {menuPage === 'timer'
               ? <>
+              {view === 'queue' && playbackQueue.length > 0 && <button role="menuitem" onClick={() => { setMenuOpen(false); setClearOpen(true) }}><Trash2 size={16} /> Remove all tracks</button>}
                 <button role="menuitem" onClick={() => setMenuPage('main')}><ArrowLeft size={16} /> Sleep timer</button>
                 {SLEEP_OPTIONS.map((minutes) => <button key={minutes} role="menuitem" onClick={() => startSleep(minutes)}>
                   <Timer size={16} /> {minutes} minutes
@@ -967,6 +988,14 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
         </>}
       </section>
     </div>}
+    {clearOpen && <ConfirmModal
+  title="Remove all tracks?"
+  message="This clears your whole queue."
+  confirmLabel="Remove all"
+  onCancel={() => setClearOpen(false)}
+  onConfirm={clearQueue}
+/>}
+
   </>
 }
 

@@ -1,9 +1,10 @@
 import { useAccount } from '../features/account/AccountContext'
 import { useFriends } from '../features/friends/FriendsContext'
-import { Music2, Home, ListMusic, History, Settings } from 'lucide-react'
+import { Music2, Home, ListMusic, History, Settings, CirclePlus} from 'lucide-react'
 
 const NAV = [
   { id: 'home',      label: 'Home',         icon: Home },
+  { id: 'create', label: 'Create Room', icon: CirclePlus },
   { id: 'playlists', label: 'Playlists',    icon: ListMusic, authOnly: true },
   { id: 'recent',    label: 'Recent Rooms', icon: History },
   { id: 'settings',  label: 'Settings',     icon: Settings,  authOnly: true },

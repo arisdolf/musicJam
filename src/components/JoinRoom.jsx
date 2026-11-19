@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Headphones, Plus, ArrowRight } from 'lucide-react'
-import HomeSearch from './HomeSearch'
+
 // Postel's law: be liberal in what you accept. People paste "abc-123", " abc 123 ", or a whole
 // invite link (…/?room=ABC123). All of those become a clean room code.
 function parseRoomCode(raw) {
@@ -9,7 +9,7 @@ function parseRoomCode(raw) {
   return (fromLink ? fromLink[1] : text).replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 8)
 }
 
-export default function JoinRoom({ onJoin, onPlaySong, onQueueTrack }) {
+export default function JoinRoom({ onJoin }) {
   const [code, setCode] = useState('')
   const [message, setMessage] = useState('')
 
@@ -24,7 +24,6 @@ export default function JoinRoom({ onJoin, onPlaySong, onQueueTrack }) {
   }
 
   return <main className="page narrow home">
-  <HomeSearch onPlaySong={onPlaySong} onQueueTrack={onQueueTrack} />
     <div className="home-icon"><Headphones size={25} /></div>
     <h1>Listen together</h1>
     <p className="muted">Start a room, add songs, and play them in sync with friends.</p>

@@ -485,3 +485,28 @@ export async function getTrackDetails(track, signal) {
     return track
   }
 }
+
+// Top 25 songs in the Philippines right now (YouTube's chart). ~2 quota units, cached 10 min.
+export function getTrending(signal) {
+  return cached('trending|PH|25', async () => {
+    const tracks = []
+    let pageToken = ''
+    for (let page = 0; page < 2 && tracks.length < 25; page++) {
+      const data = await yt('videos', {
+        part: 'snippet,status,contentDetails,statistics',
+        chart: 'mostPopular', videoCategoryId: '10', regionCode: REGION, maxResults: '50',
+        ...(pageToken ? { pageToken } : {}),
+      }, signal)
+      for (const item of data.items || []) {
+        if (!isPlayable(item, REGION)) continue
+        if (NOT_A_SONG.test(item.snippet?.title || '')) continue
+        const track = toTrack(item)
+        if (track.duration < 90 || track.duration > 480) continue
+        tracks.push(track)
+      }
+      pageToken = data.nextPageToken || ''
+      if (!pageToken) break
+    }
+    return tracks.slice(0, 25)
+  })
+}

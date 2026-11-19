@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { useAccount } from '../features/account/AccountContext'
-import { ArrowLeft, Check, Disc3, ListMusic, Music2, Pencil, Play, Plus, Search, Trash2, X, ListPlus, Upload, Loader } from 'lucide-react'
+import { ArrowLeft, Heart, Check, Disc3, ListMusic, Music2, Pencil, Play, Plus, Search, Trash2, X, ListPlus, Upload, Loader } from 'lucide-react'
 import FeedbackModal from '../components/FeedbackModal'
 import ConfirmModal from '../components/ConfirmModal'
 import { layoutTransitionName, withViewTransition } from '../utils/viewTransitions'
@@ -190,12 +190,13 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
               <button className="icon-btn" type="submit" aria-label="Save playlist name" disabled={busy || !editName.trim()}><Check size={17} /></button>
               <button className="icon-btn" type="button" aria-label="Cancel rename" onClick={() => setEditing(false)}><X size={17} /></button>
             </form>
-            : <div className="playlist-title-row"><h1>{selected.name}</h1><button className="icon-btn" onClick={() => { setEditName(selected.name); setEditing(true); setError('') }} aria-label="Rename playlist"><Pencil size={16} /></button></div>}
+            : <div className="playlist-title-row"><h1>{selected.name}</h1>
+            {!selected.isLiked && <button className="icon-btn" onClick={() => { setEditName(selected.name); setEditing(true); setError('') }} aria-label="Rename playlist"><Pencil size={16} /></button>}</div>}
           <p className="muted">{selected.tracks.length} {selected.tracks.length === 1 ? 'track' : 'tracks'} · Your saved collection</p>
           <div className="playlist-detail-actions">
             <button className="btn btn-primary" onClick={() => playAt(0)} disabled={!selected.tracks.length}><Play size={16} /> Play playlist</button>
             <button className="btn" onClick={onBrowse}><Plus size={16} /> Add songs</button>
-            <button className="btn btn-text danger-text" onClick={() => remove(selected)}><Trash2 size={16} /> Delete</button>
+            {!selected.isLiked && <button className="btn btn-text danger-text" onClick={() => remove(selected)}><Trash2 size={16} /> Delete</button>}
           </div>
         </div>
       </section>
@@ -242,7 +243,7 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
             <button className="playlist-card-open" onClick={() => openPlaylist(playlist)} aria-label={`Open ${playlist.name}`}>
               <span className="playlist-cover" style={{ viewTransitionName: layoutTransitionName(playlist.id) }} aria-hidden="true">
                 {playlist.tracks.slice(0, 4).map((track, index) => <img key={`${track.id}-${index}`} src={track.thumbnail || ''} alt="" loading="lazy" />)}
-                {playlist.tracks.length === 0 && <Music2 size={28} />}
+                {playlist.tracks.length === 0 && (playlist.isLiked ? <Heart size={28} /> : <Music2 size={28} />)}
               </span>
               <span className="playlist-card-copy"><strong>{playlist.name}</strong><small>{playlist.tracks.length} {playlist.tracks.length === 1 ? 'track' : 'tracks'}</small></span>
               <span className="playlist-card-play"><Play size={17} fill="currentColor" /></span>
@@ -252,7 +253,7 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
                 openPlaylist(playlist, true)
                 onPlayTracks(playlist.tracks, 0)
               }} disabled={!playlist.tracks.length}><Play size={14} /> Play</button>
-              <button className="icon-btn" onClick={() => remove(playlist)} aria-label={`Delete ${playlist.name}`} title="Delete playlist"><Trash2 size={15} /></button>
+              {!playlist.isLiked  && <button className="icon-btn" onClick={() => remove(playlist)} aria-label={`Delete ${playlist.name}`} title="Delete playlist"><Trash2 size={15} /></button>}
             </div>
           </article>)}
         </div>}

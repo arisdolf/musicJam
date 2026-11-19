@@ -6,13 +6,15 @@ import {
   onAuthStateChanged, signOut, updateProfile, EmailAuthProvider, reauthenticateWithCredential,
   updatePassword, deleteUser,
 } from 'firebase/auth'
-import { ref, onValue, push, set, remove, get } from 'firebase/database'
+import { ref, onValue, push, set, remove, get, update } from 'firebase/database'
 import { auth, db } from '../../services/firebase'
 
 const AccountContext = createContext(null)
 export const useAccount = () => useContext(AccountContext)
 
 const MAX_TRACKS = 200
+export const LIKED_ID = 'liked'
+const LIKED_NAME = 'Liked songs'
 
 const toUser = (u) => u && ({
   id: u.uid,
@@ -52,6 +54,12 @@ const uid = () => {
   return id
 }
 
+// Liked songs always exists and always comes first, even before the first like.
+const withLiked = (list) => {
+  const liked = list.find((p) => p.id === LIKED_ID) || { id: LIKED_ID, createdAt: 0, tracks: [] }
+  return [{ ...liked, name: LIKED_NAME, isLiked: true }, ...list.filter((p) => p.id !== LIKED_ID)]
+}
+
 export function AccountProvider({ children }) {
   const [user, setUser] = useState(null)
   const [playlists, setPlaylists] = useState([])
@@ -70,7 +78,7 @@ export function AccountProvider({ children }) {
     setPlaylistsReady(false); setPlaylistsError('')
     return onValue(ref(db, `playlists/${userId}`),
       (snap) => {
-        const list = parsePlaylists(snap.val())
+        const list = withLiked(parsePlaylists(snap.val()))
         playlistsRef.current = list
         setPlaylists(list); setPlaylistsReady(true)
       },
@@ -122,6 +130,30 @@ export function AccountProvider({ children }) {
     await deleteUser(u)
   }, [])
 
+
+  const likedIds = useMemo(
+  () => new Set((playlists.find((p) => p.id === LIKED_ID)?.tracks || []).map((t) => t.id)),
+  [playlists],
+)
+
+// Heart button: adds to / removes from the constant "Liked songs" playlist (newest first).
+const toggleLike = useCallback(async (track) => {
+  if (!track?.id) return
+  const id = uid()
+  const liked = playlistsRef.current.find((p) => p.id === LIKED_ID)
+  if (liked?.tracks.some((t) => t.id === track.id)) {
+    await remove(ref(db, `playlists/${id}/${LIKED_ID}/tracks/${track.id}`))
+    return
+  }
+  if ((liked?.tracks.length || 0) >= MAX_TRACKS) throw new Error(`Liked songs can hold up to ${MAX_TRACKS} songs.`)
+  await update(ref(db, `playlists/${id}/${LIKED_ID}`), {
+    name: LIKED_NAME,
+    createdAt: 0,
+    [`tracks/${track.id}`]: trackNode(track, -Date.now()),
+  })
+}, [])
+
+
   // ── Playlists ─────────────────────────────────────────────────────────
   const createPlaylist = useCallback(async (name, tracks = []) => {
     const id = uid()
@@ -139,25 +171,31 @@ export function AccountProvider({ children }) {
   }, [])
 
   const addToPlaylist = useCallback(async (playlistId, track) => {
+  if (playlistId === LIKED_ID) {
+    if (!playlistsRef.current.find((p) => p.id === LIKED_ID)?.tracks.some((t) => t.id === track.id)) await toggleLike(track)
+    return
+  }
     const id = uid()
     const playlist = playlistsRef.current.find((p) => p.id === playlistId)
     if (!playlist) throw new Error('Playlist not found.')
     if (playlist.tracks.some((t) => t.id === track.id)) return
     if (playlist.tracks.length >= MAX_TRACKS) throw new Error(`A playlist can hold up to ${MAX_TRACKS} songs.`)
     await set(ref(db, `playlists/${id}/${playlistId}/tracks/${track.id}`), trackNode(track, playlist.tracks.length))
-  }, [])
+  }, [toggleLike])
 
   const removeFromPlaylist = useCallback(async (playlistId, trackId) => {
     await remove(ref(db, `playlists/${uid()}/${playlistId}/tracks/${trackId}`))
   }, [])
 
   const renamePlaylist = useCallback(async (playlistId, name) => {
+  if (playlistId === LIKED_ID) throw new Error('Liked songs can’t be renamed.')
     const clean = name.trim().slice(0, 60)
     if (!clean) throw new Error('Enter a playlist name.')
     await set(ref(db, `playlists/${uid()}/${playlistId}/name`), clean)
   }, [])
 
-  const deletePlaylist = useCallback(async (playlistId) => {
+ const deletePlaylist = useCallback(async (playlistId) => {
+  if (playlistId === LIKED_ID) throw new Error('Liked songs can’t be deleted.')
     await remove(ref(db, `playlists/${uid()}/${playlistId}`))
   }, [])
 
@@ -165,8 +203,10 @@ export function AccountProvider({ children }) {
     user, playlists, playlistsReady, playlistsError, authMode, loadingAccount,
     openAuth: setAuthMode, closeAuth: () => setAuthMode(null),
     signUp, logIn, logInWithGoogle, logOut, updateName, changePassword, deleteAccount,
+    likedIds, toggleLike,
     createPlaylist, renamePlaylist, addToPlaylist, removeFromPlaylist, deletePlaylist,
   }), [user, playlists, playlistsReady, playlistsError, authMode, loadingAccount,
+    likedIds, toggleLike,
        signUp, logIn, logInWithGoogle, logOut, updateName, changePassword, deleteAccount,
        createPlaylist, renamePlaylist, addToPlaylist, removeFromPlaylist, deletePlaylist])
 
