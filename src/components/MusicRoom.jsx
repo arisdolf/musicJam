@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { searchYouTube, getSimilarTracks } from '../services/youtube'
-import AddToPlaylist from './AddToPlaylist'
 import FeedbackModal from './FeedbackModal'
 import { useAccount } from '../features/account/AccountContext'
 import ConfirmModal from './ConfirmModal'
@@ -9,7 +8,7 @@ import InviteFriendsModal from './InviteFriendsModal'
 import { useTopbar } from './TopBarContext'
 import LikeButton from './LikeButton'
 import TrackMenu, { DotsMenu } from './TrackMenu'
-import { Play, Search, Music2, Check, X, Plus, Trash2, GripVertical, ListMusic, ListPlus, ChevronDown, LogOut, UserPlus, Sparkles, ListStart } from 'lucide-react'
+import { Play, Search, Music2, Check, X, Plus, Trash2, GripVertical, ListMusic, ListPlus, ChevronDown, LogOut, UserPlus, Sparkles } from 'lucide-react'
 
 export default function MusicRoom({ roomCode, room, updateRoom, connection, members, onLeave, onPlayTrack, onQueueTrack, onPlayTracks, onQueueTracks, onPlayNext }) {
   const { user, openAuth, createPlaylist } = useAccount()
@@ -70,18 +69,7 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
     })
   }, [room.queue])
 
-  function SongRow({ track, queued, onPlayTrack, onPlayNext, onQueueTrack }) {
-    return <div className="track">
-      <img src={track.thumbnail} alt="" />
-      <div className="track-text"><strong>{track.title}</strong><small>{track.artist}</small></div>
-      <div className="track-actions">
-        <AddToPlaylist track={track} />
-        <button className="icon-btn" onClick={() => onPlayTrack(track)} aria-label={`Play ${track.title}`} title="Play now"><Play size={16} fill="currentColor" /></button>
-        <button className="icon-btn" onClick={() => onPlayNext(track)} aria-label={`Play ${track.title} next`} title="Play next"><ListStart size={16} /></button>
-        <button className="icon-btn add-btn" disabled={queued} onClick={(event) => onQueueTrack(track, event.currentTarget)} aria-label={`Add ${track.title} to queue`} title={queued ? 'In queue' : 'Add to queue'}>{queued ? <Check size={16} /> : <Plus size={17} />}</button>
-      </div>
-    </div>
-  }
+
 
   useEffect(() => {
     if (!seed) return undefined
@@ -299,4 +287,17 @@ function RoomPlaylists({ onPlayTracks, onQueueTracks, onPlayTrack, onQueueTrack 
       </li>
     })}
   </ul>
+}
+
+function SongRow({ track, queued, onPlayTrack, onPlayNext, onQueueTrack }) {
+  return <div className="track">
+    <img src={track.thumbnail} alt="" />
+    <div className="track-text"><strong>{track.title}</strong><small>{track.artist}</small></div>
+    <div className="track-actions">
+      <LikeButton track={track} />
+      <button className="icon-btn" onClick={() => onPlayTrack(track)} aria-label={`Play ${track.title}`} title="Play now"><Play size={16} fill="currentColor" /></button>
+      <button className="icon-btn add-btn" disabled={queued} onClick={(event) => onQueueTrack(track, event.currentTarget)} aria-label={`Add ${track.title} to queue`} title={queued ? 'In queue' : 'Add to queue'}>{queued ? <Check size={16} /> : <Plus size={17} />}</button>
+      <TrackMenu track={track} onPlayNext={() => onPlayNext(track)} />
+    </div>
+  </div>
 }

@@ -12,7 +12,7 @@ import TrackMenu from './TrackMenu'
 import ConfirmModal from './ConfirmModal'
 import {
   ArrowLeft, Check, ChevronDown, Disc3, GripVertical, ListMusic, ListOrdered, Loader, LogIn, Mic2, MicOff, Minus, MoreVertical,
-  Pause, Play, Plus, Repeat1, Search, Shuffle, SkipBack, SkipForward, Timer, TimerOff, Trash2, ListStart
+  Pause, Play, Plus, Repeat1, Search, Shuffle, SkipBack, SkipForward, Timer, TimerOff, Trash2, ListStart, ListPlus
 } from 'lucide-react'
 
 // 1 second of silence. Looping it keeps the phone treating this page as "playing media".
@@ -85,6 +85,8 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
   const { user, openAuth } = useAccount()
   const [ytState, setYtState] = useState(-1)
   const ytStateTimer = useRef(0)
+  const [playlistOpen, setPlaylistOpen] = useState(false)
+const moreRef = useRef(null)
   const userPauseRef = useRef(0) // when the listener last paused on purpose
   const [playerReady, setPlayerReady] = useState(false)
   const [expanded, setExpanded] = useState(false)
@@ -142,8 +144,8 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
   const currentLyricText = showLyrics && activeLyricIndex >= 0 ? lyricLines[activeLyricIndex]?.text : ''
 
   const collapse = useCallback(() => {
-    setExpanded(false); setMenuOpen(false); setView('player'); setQueueExiting(false)
-  }, [])
+  setExpanded(false); setMenuOpen(false); setView('player'); setQueueExiting(false); setPlaylistOpen(false)
+}, [])
 
   const toggleLyrics = () => {
     const next = !showLyrics
@@ -841,6 +843,7 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
           </button>
           <span className="np-kicker">{view === 'queue' ? 'UP NEXT' : view === 'search' ? 'ADD MUSIC' : 'NOW PLAYING'}</span>
           <button
+          ref={moreRef}
             className={`np-icon${menuOpen ? ' is-open' : ''}${sleepEnd ? ' has-timer' : ''}`}
             onClick={() => setMenuOpen((open) => !open)}
             aria-label="More options"
@@ -927,7 +930,7 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
                   aria-label={showLyrics ? 'Turn lyrics off' : 'Turn lyrics on'}
                   title={showLyrics ? 'Lyrics on' : 'Lyrics off'}
                 >{showLyrics ? <Mic2 size={17} /> : <MicOff size={17} />}</button>
-                <AddToPlaylist track={currentTrack} />
+                <LikeButton track={currentTrack} />
               </div>
 
               {showLyrics && !lyricsFullOn && <div className="np-lyric-window" aria-live="off">
@@ -964,7 +967,7 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
           <div className="np-menu" role="menu">
             {menuPage === 'timer'
               ? <>
-             
+
                 <button role="menuitem" onClick={() => setMenuPage('main')}><ArrowLeft size={16} /> Sleep timer</button>
                 {SLEEP_OPTIONS.map((minutes) => <button key={minutes} role="menuitem" onClick={() => startSleep(minutes)}>
                   <Timer size={16} /> {minutes} minutes
@@ -973,8 +976,9 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
               </>
               : <>
                 <button role="menuitem" onClick={() => { setView('search'); setMenuOpen(false) }}><Search size={16} /> Add music</button>
-{playbackQueue.length > 0 && <button role="menuitem" onClick={() => { setMenuOpen(false); setClearOpen(true) }}><Trash2 size={16} /> Remove all tracks</button>}
-<button role="menuitem" onClick={() => setMenuPage('timer')}>
+                <button role="menuitem" onClick={() => { setMenuOpen(false); setPlaylistOpen(true) }}><ListPlus size={16} /> Add to playlist</button>
+                {playbackQueue.length > 0 && <button role="menuitem" onClick={() => { setMenuOpen(false); setClearOpen(true) }}><Trash2 size={16} /> Remove all tracks</button>}
+                <button role="menuitem" onClick={() => setMenuPage('timer')}>
                   <Timer size={16} /> Sleep timer {sleepEnd && <small>{sleepLabel}</small>}
                 </button>
 
@@ -990,12 +994,13 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
       </section>
     </div>}
     {clearOpen && <ConfirmModal
-  title="Remove all tracks?"
-  message="This clears your whole queue."
-  confirmLabel="Remove all"
-  onCancel={() => setClearOpen(false)}
-  onConfirm={clearQueue}
-/>}
+      title="Remove all tracks?"
+      message="This clears your whole queue."
+      confirmLabel="Remove all"
+      onCancel={() => setClearOpen(false)}
+      onConfirm={clearQueue}
+    />}
+    {fullOpen && <AddToPlaylist track={currentTrack} hideButton open={playlistOpen} onOpenChange={setPlaylistOpen} anchorRef={moreRef} />}
 
   </>
 }

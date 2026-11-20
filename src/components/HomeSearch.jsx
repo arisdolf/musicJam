@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Check, Loader, Play, Plus, Search, X } from 'lucide-react'
 import { quickSearch, getTrackDetails } from '../services/youtube'
-import AddToPlaylist from './AddToPlaylist'
+
+import LikeButton from './LikeButton'
+import TrackMenu from './TrackMenu'
 
 const IDLE = { query: '', status: 'idle', results: [], error: '' }
 const DEBOUNCE_MS = 300   // wait this long after the last keystroke
@@ -101,13 +103,14 @@ export default function HomeSearch({ onPlaySong, onQueueTrack }) {
                         <strong>{track.title}</strong><small>{track.artist}</small>
                     </button>
                     <div className="track-actions">
-                        <AddToPlaylist track={track} />
+                        <LikeButton track={track} />
                         <button className="icon-btn" onClick={() => choose(track)} disabled={Boolean(busyId)} aria-label={`Play ${track.title}`} title="Play now">
                             {busyId === track.id ? <Loader size={16} className="spin" /> : <Play size={16} fill="currentColor" />}
                         </button>
                         <button className="icon-btn add-btn" onClick={(event) => queue(track, event.currentTarget)} disabled={queued} aria-label={`Add ${track.title} to queue`} title={queued ? 'In queue' : 'Add to queue'}>
                             {queued ? <Check size={16} /> : <Plus size={17} />}
                         </button>
+                        <TrackMenu track={track} />
                     </div>
                 </div>
             })}

@@ -3,7 +3,7 @@ import { Check, Flame, Loader, Play, Plus, RotateCw, Trash2} from 'lucide-react'
 import HomeSearch from '../components/HomeSearch'
 import LikeButton from '../components/LikeButton'
 import { getTrending } from '../services/youtube'
-
+import TrackMenu from '../components/TrackMenu'
 export default function Home({ onPlaySong, onQueueTrack, onPlayTracks }) {
   const [state, setState] = useState({ loading: true, tracks: [], error: '' })
   const [attempt, setAttempt] = useState(0)
@@ -64,6 +64,7 @@ export default function Home({ onPlaySong, onQueueTrack, onPlayTracks }) {
             <button className="icon-btn add-btn" disabled={queued} onClick={(event) => queue(track, event.currentTarget)} aria-label={`Add ${track.title} to queue`} title={queued ? 'In queue' : 'Add to queue'}>
               {queued ? <Check size={16} /> : <Plus size={17} />}
             </button>
+            <TrackMenu track={track} />
           </div>
         </li>
       })}

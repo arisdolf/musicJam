@@ -67,16 +67,13 @@ export function DotsMenu({ items, label = 'More options', buttonRef, className =
 export default function TrackMenu({ track, onPlayNext, onRemove, playNextDisabled }) {
   const buttonRef = useRef(null)
   const [playlistOpen, setPlaylistOpen] = useState(false)
+
+  const items = [{ label: 'Add to playlist', icon: <ListPlus size={16} />, onClick: () => setPlaylistOpen(true) }]
+  if (onPlayNext) items.push({ label: 'Play next', icon: <ListStart size={16} />, onClick: onPlayNext, disabled: playNextDisabled })
+  if (onRemove) items.push({ label: 'Remove from queue', icon: <Trash2 size={16} />, onClick: onRemove, danger: true })
+
   return <>
-    <DotsMenu
-      buttonRef={buttonRef}
-      label={`More options for ${track.title}`}
-      items={[
-        { label: 'Add to playlist', icon: <ListPlus size={16} />, onClick: () => setPlaylistOpen(true) },
-        { label: 'Play next', icon: <ListStart size={16} />, onClick: onPlayNext, disabled: playNextDisabled },
-        { label: 'Remove from queue', icon: <Trash2 size={16} />, onClick: onRemove, danger: true },
-      ]}
-    />
+    <DotsMenu buttonRef={buttonRef} label={`More options for ${track.title}`} items={items} />
     <AddToPlaylist track={track} hideButton anchorRef={buttonRef} open={playlistOpen} onOpenChange={setPlaylistOpen} />
   </>
 }
