@@ -234,3 +234,16 @@ button, a, input, [role="button"], [role="checkbox"] { touch-action: manipulatio
   width: 0;
   height: 0;
 }
+
+/* ── Raise the prev / play / next row ── */
+.np-controls {
+  padding-bottom: max(80px, calc(env(safe-area-inset-bottom, 0px) + 70px));
+}
+/* keep the mode toast just above the raised controls */
+.np-toast {
+  bottom: calc(max(52px, calc(env(safe-area-inset-bottom, 0px) + 40px)) + 84px);
+}
+/* the cover art gives up a little height so nothing gets squeezed */
+.np-body:not(.no-lyrics) .np-stage:not(.is-lyrics) {
+  width: min(100%, clamp(110px, calc(var(--np-h) - 520px), 42dvh));
+}

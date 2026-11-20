@@ -33,7 +33,7 @@ function Shell() {
     playTracks: playLocalTracks,
     startVideo,
   } = usePlayback()
-  const [view, setView] = useState('home')   // 'home'|'playlists'|'quota'|'recent'|'settings'
+  const [view, setView] = useState(() => new URLSearchParams(window.location.search).get('room') ? 'jam' : 'home')
   const [roomCode, setRoomCode] = useState(() => new URLSearchParams(window.location.search).get('room')?.toUpperCase() || '')
   const [settingsSection, setSettingsSection] = useState(null) // null | 'friends' | 'quota'
   const [queueFly, setQueueFly] = useState(null)
@@ -51,10 +51,10 @@ function Shell() {
     setRoomCode(code)
   }, [])
 
-  const joinRoom = useCallback((code) => {
-    setView('home')
-    setUrlRoom(code)
-  }, [setUrlRoom])
+ const joinRoom = useCallback((code) => {
+  setView('create')
+  setUrlRoom(code)
+}, [setUrlRoom])
 
 
   // Clicking a system notification: join the invited room, or open Friends.
@@ -155,9 +155,9 @@ function Shell() {
     updateRoom((state) => playNext(state, track))
   }, [roomCode, updateRoom, updateLocalPlayback])
 
-  const fallbackTitle = roomCode && view === 'home'
-    ? `Room ${roomCode}`
-    : ({ home: 'Home', create: 'Create room', playlists: 'Playlists', recent: 'Recent rooms', settings: 'Settings' }[view] || '')
+  const fallbackTitle = roomCode && view === 'create'
+  ? `Room ${roomCode}`
+  : ({ home: 'Home', create: 'Jam Room', playlists: 'Playlists', recent: 'Recent rooms', settings: 'Settings' }[view] || '')
 
   const queueTrack = useCallback((track, trigger) => {
     if (!track?.id) return
@@ -189,19 +189,18 @@ const playWithSimilar = useCallback(async (track) => {
 }, [playTrack, queueTracks])
 
 const renderContent = () => {
-    if (roomCode && view === 'home') {
-      
-      return <MusicRoom roomCode={roomCode} room={room} updateRoom={updateRoom} connection={connection} members={members} onLeave={leaveRoom} onPlayTrack={playTrack} onQueueTrack={queueTrack} onPlayTracks={playTracks} onQueueTracks={queueTracks} onPlayNext={playNextTrack} />
-    }
-    
-    switch (view) {
-  case 'create': return <JoinRoom onJoin={joinRoom} />
-  case 'playlists': return <Playlists onBrowse={() => navigate('home')} onPlayTracks={playTracks} onQueueTrack={queueTrack} />
-  case 'recent': return <RecentRooms onJoin={joinRoom} />
-  case 'settings': return user ? <Settings roomCode={roomCode} section={settingsSection} onSectionChange={setSettingsSection} /> : null
-  default: return <Home onPlaySong={playWithSimilar} onQueueTrack={queueTrack} onPlayTracks={playTracks} />
-}
+  if (roomCode && view === 'create') {
+    return <MusicRoom roomCode={roomCode} room={room} updateRoom={updateRoom} connection={connection} members={members} onLeave={leaveRoom} onPlayTrack={playTrack} onQueueTrack={queueTrack} onPlayTracks={playTracks} onQueueTracks={queueTracks} onPlayNext={playNextTrack} />
   }
+
+  switch (view) {
+    case 'create': return <JoinRoom onJoin={joinRoom} />
+    case 'playlists': return <Playlists onBrowse={() => navigate('home')} onPlayTracks={playTracks} onQueueTrack={queueTrack} />
+    case 'recent': return <RecentRooms onJoin={joinRoom} />
+    case 'settings': return user ? <Settings roomCode={roomCode} section={settingsSection} onSectionChange={setSettingsSection} /> : null
+    default: return <Home onPlaySong={playWithSimilar} onQueueTrack={queueTrack} onPlayTracks={playTracks} />
+  }
+}
 
   return (
     <div className={`app-shell${playbackState.queue.length ? ' has-player' : ''}`}>

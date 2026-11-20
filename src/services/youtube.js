@@ -1,4 +1,4 @@
-// src/services/youtube.js
+import { cleanTrackInfo } from '../utils/cleanTrack'
 import { findLyricsForTrack } from './lyrics'
 const API_BASE = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '')
 const REGION = 'PH'
@@ -233,11 +233,13 @@ async function cached(key, load) {
 
 function toTrack(item) {
   const { snippet, contentDetails, statistics } = item
+  const info = cleanTrackInfo(snippet.title, snippet.channelTitle)
   return {
     id: item.id,
-    title: snippet.title,
-    artist: snippet.channelTitle.replace(/\s*-\s*topic$/i, ''),
-    channel: snippet.channelTitle,  
+    title: info.title,
+    artist: info.artist,
+    rawTitle: snippet.title,
+    channel: snippet.channelTitle,
     thumbnail: snippet.thumbnails?.medium?.url || `https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`,
     duration: parseDuration(contentDetails?.duration),
     views: Number(statistics?.viewCount || 0),
@@ -338,7 +340,7 @@ function isOfficialSource(track) {
   if (LABELS.test(channel)) return true
   // Artist channel: its name appears at the front of the title ("Artist - Song").
   const name = norm(channel.replace(/\bofficial\b/gi, ''))
-  const head = norm(track.title.split(/\s[-–—|]\s/)[0])
+  const head = norm((track.rawTitle || track.title).split(/\s[-–—|]\s/)[0])
   return name.length >= 3 && head.length >= 3 && (head.includes(name) || name.includes(head))
 }
 
@@ -458,19 +460,22 @@ export function quickSearch(query, signal) {
     return (search.items || [])
       .filter((item) => item.id?.videoId && !NOT_A_SONG.test(item.snippet?.title || ''))
       .map((item) => {
-        const { snippet } = item
-        const id = item.id.videoId
-        return {
-          id,
-          title: decodeHtml(snippet.title),
-          artist: decodeHtml(snippet.channelTitle).replace(/\s*-\s*topic$/i, ''),
-          channel: snippet.channelTitle,
-          thumbnail: snippet.thumbnails?.medium?.url || `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
-          duration: 0,
-          views: 0,
-          year: Number((snippet.publishedAt || '').slice(0, 4)) || 0,
-        }
-      })
+  const { snippet } = item
+  const id = item.id.videoId
+  const rawTitle = decodeHtml(snippet.title)
+  const info = cleanTrackInfo(rawTitle, decodeHtml(snippet.channelTitle))
+  return {
+    id,
+    title: info.title,
+    artist: info.artist,
+    rawTitle,
+    channel: snippet.channelTitle,
+    thumbnail: snippet.thumbnails?.medium?.url || `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
+    duration: 0,
+    views: 0,
+    year: Number((snippet.publishedAt || '').slice(0, 4)) || 0,
+  }
+})
   })
 }
 

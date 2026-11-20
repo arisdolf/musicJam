@@ -964,7 +964,7 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
           <div className="np-menu" role="menu">
             {menuPage === 'timer'
               ? <>
-              {view === 'queue' && playbackQueue.length > 0 && <button role="menuitem" onClick={() => { setMenuOpen(false); setClearOpen(true) }}><Trash2 size={16} /> Remove all tracks</button>}
+             
                 <button role="menuitem" onClick={() => setMenuPage('main')}><ArrowLeft size={16} /> Sleep timer</button>
                 {SLEEP_OPTIONS.map((minutes) => <button key={minutes} role="menuitem" onClick={() => startSleep(minutes)}>
                   <Timer size={16} /> {minutes} minutes
@@ -973,7 +973,8 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
               </>
               : <>
                 <button role="menuitem" onClick={() => { setView('search'); setMenuOpen(false) }}><Search size={16} /> Add music</button>
-                <button role="menuitem" onClick={() => setMenuPage('timer')}>
+{playbackQueue.length > 0 && <button role="menuitem" onClick={() => { setMenuOpen(false); setClearOpen(true) }}><Trash2 size={16} /> Remove all tracks</button>}
+<button role="menuitem" onClick={() => setMenuPage('timer')}>
                   <Timer size={16} /> Sleep timer {sleepEnd && <small>{sleepLabel}</small>}
                 </button>
 

@@ -9,7 +9,7 @@ import InviteFriendsModal from './InviteFriendsModal'
 import { useTopbar } from './TopBarContext'
 import LikeButton from './LikeButton'
 import TrackMenu, { DotsMenu } from './TrackMenu'
-import { Play, Search, Music2, Check, X, Plus, GripVertical, ListMusic, ListPlus, ChevronDown, LogOut, UserPlus, Sparkles, ListStart } from 'lucide-react'
+import { Play, Search, Music2, Check, X, Plus, Trash2, GripVertical, ListMusic, ListPlus, ChevronDown, LogOut, UserPlus, Sparkles, ListStart } from 'lucide-react'
 
 export default function MusicRoom({ roomCode, room, updateRoom, connection, members, onLeave, onPlayTrack, onQueueTrack, onPlayTracks, onQueueTracks, onPlayNext }) {
   const { user, openAuth, createPlaylist } = useAccount()
