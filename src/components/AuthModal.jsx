@@ -102,7 +102,8 @@ function friendlyError(err) {
   if (code === 'auth/invalid-credential')      return 'Email or password is incorrect.'
   if (code === 'auth/weak-password')           return 'Use a password with at least 6 characters.'
   if (code === 'auth/invalid-email')           return 'Enter a valid email address.'
+  if (code === 'auth/network-request-failed') return 'Couldn’t connect. Check your connection and try again.'
   if (code === 'auth/popup-closed-by-user')    return ''   // user cancelled — no error shown
   if (code === 'auth/too-many-requests')       return 'Too many attempts. Please wait a moment and try again.'
-  return err?.message || 'Something went wrong. Try again.'
+  return 'Couldn’t complete sign-in. Check your details and try again.'
 }

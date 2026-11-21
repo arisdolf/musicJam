@@ -5,7 +5,8 @@
   --bg: #ffffff; --surface: #fcf1f2; --ink: #1f0a0d; --muted: #7a5258; --line: #efd3d6;
   --accent: #a8111f; --accent-dark: #8a0d19; --accent-hover: #8a0d19; --accent-soft: #fbe6e8;
   --accent-2: #d4453f;            /* coral highlight */
-  --live: #17a05f;                /* "live / ok" green */
+  --live: #0d7144; --live-soft: #e5f5eb;
+  --warning: #765b00; --warning-soft: #fbf3d6;
   --danger: #d84315; --danger-hover: #b8360f; --on-danger: #fff; --danger-bg: #fff8f5; --danger-line: #f7cdbd;
   --scrim: rgba(10,10,10,.55); --player-bg: #0b0b0c;
   --spot: linear-gradient(135deg, #8f0c1a, #c01f2b);
@@ -20,7 +21,7 @@
   --ease-out: cubic-bezier(.4, 0, .2, 1);
   --ease-in: cubic-bezier(.55, 0, 1, .45);
   --ease-in-out: cubic-bezier(.65, 0, .35, 1);
-  --spring: cubic-bezier(.4, 0, .2, 1);   /* name kept for older rules; plain ease in-out, no overshoot */
+  --spring: cubic-bezier(.16, 1, .3, 1);  /* legacy token name; confident deceleration without overshoot */
   --dur-fast: 150ms; --dur: 320ms;
   --shift: 14px;      /* how far things travel on enter */
   --pop: .94;         /* start scale for popups */
@@ -30,7 +31,8 @@
     color-scheme: dark;
     --bg: #0a0a0b; --surface: #151516; --ink: #f7f7f7; --muted: #a4a4a8; --line: #2a2a2c;
     --accent: #c2202f; --accent-dark: #ff8f98; --accent-hover: #a71a27; --accent-soft: #2a1013;
-    --accent-2: #ff8a80; --live: #4be39b;
+    --accent-2: #ff8a80; --live: #4be39b; --live-soft: #173b2b;
+    --warning: #f1ce68; --warning-soft: #322b16;
     --danger: #ff9b6b; --danger-hover: #ffb08a; --on-danger: #2a0d05; --danger-bg: #2a1410; --danger-line: #6b3320;
     --scrim: rgba(0,0,0,.72);
     --spot: linear-gradient(135deg, #9c0f1f, #d02a35);
@@ -42,7 +44,8 @@
   color-scheme: dark;
   --bg: #0a0a0b; --surface: #151516; --ink: #f7f7f7; --muted: #a4a4a8; --line: #2a2a2c;
   --accent: #c2202f; --accent-dark: #ff8f98; --accent-hover: #a71a27; --accent-soft: #2a1013;
-  --accent-2: #ff8a80; --live: #4be39b;
+  --accent-2: #ff8a80; --live: #4be39b; --live-soft: #173b2b;
+  --warning: #f1ce68; --warning-soft: #322b16;
   --danger: #ff9b6b; --danger-hover: #ffb08a; --on-danger: #2a0d05; --danger-bg: #2a1410; --danger-line: #6b3320;
   --scrim: rgba(0,0,0,.72);
   --spot: linear-gradient(135deg, #9c0f1f, #d02a35);

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { AtSign, Bell, Check, Search, Send, UserMinus, UserPlus, Users } from 'lucide-react'
+import { AtSign, Bell, Check, Search, Send, UserMinus, UserPlus, Users, X } from 'lucide-react'
 import { useAccount } from '../features/account/AccountContext'
 import { useFriends } from '../features/friends/FriendsContext'
 import UsernameForm from '../components/UsernameForm'
 import FeedbackModal from '../components/FeedbackModal'
 import ConfirmModal from '../components/ConfirmModal'
+import { Skeleton, TrackSkeletonList } from '../components/Skeleton'
 
 function NotificationPrompt() {
   const [permission, setPermission] = useState(typeof Notification === 'undefined' ? 'unsupported' : Notification.permission)
@@ -75,7 +76,7 @@ export default function Friends({ roomCode }) {
     <div className="playlist-page-heading"><span className="page-icon"><Users size={21} /></span><div><h1>Friends</h1><p className="muted">Add friends and invite them to your room.</p></div></div>
 
     {!profileReady
-      ? <p className="message">Loading…</p>
+      ? <TrackSkeletonList count={3} className="search-skeleton" />
       : !username
         ? <section className="settings-card">
             <div className="settings-card-header"><AtSign size={18} /><h2>Choose your username</h2></div>
@@ -91,9 +92,13 @@ export default function Friends({ roomCode }) {
 
             <label className="playlist-search"><Search size={17} /><span className="sr-only">Search usernames</span>
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by username" autoCapitalize="none" autoComplete="off" />
+              <button type="button" className="search-clear" onClick={() => setQuery('')} disabled={!query} aria-label="Clear username search"><X size={17} /></button>
             </label>
             {query.trim().replace(/^@/, '').length >= 2 && <ul className="track-list friends-list">
-              {searching && !results.length && <li className="message">Searching…</li>}
+              {searching && !results.length && Array.from({ length: 3 }, (_, index) => <li className="track friend-skeleton" key={`friend-skeleton-${index}`} aria-hidden="true">
+                <Skeleton className="friend-skeleton-avatar" />
+                <Skeleton className="friend-skeleton-name" />
+              </li>)}
               {!searching && !results.length && <li className="message">No one found with that username.</li>}
               {results.map((item) => <li className="track" key={item.uid}>
                 <span className="sidenav-avatar">{item.username.charAt(0).toUpperCase()}</span>

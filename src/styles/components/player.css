@@ -101,9 +101,13 @@
 .np-queue-track small { color: rgba(255,255,255,.6); font-size: 11px; }
 
 .np-search { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 4px 12px 0; }
-.np-search input { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.2); color: #fff; }
+.np-search-input { position: relative; flex: 0 0 auto; }
+.np-search input { padding-right: 48px; background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.2); color: #fff; }
 .np-search input::placeholder { color: rgba(255,255,255,.55); }
 .np-search input:focus { border-color: #63dbc5; box-shadow: 0 0 0 3px rgba(99,219,197,.25); }
+.np-search-clear { position: absolute; top: 4px; right: 5px; width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: transparent; color: rgba(255,255,255,.65); }
+.np-search-clear:hover:not(:disabled) { background: rgba(255,255,255,.12); color: #fff; }
+.np-search-clear:disabled { opacity: .3; }
 .np-search .np-queue-list { padding: 0; }
 .np-search-note { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 24px 14px; color: rgba(255,255,255,.65); font-size: 13px; text-align: center; }
 
@@ -134,7 +138,7 @@
   100% { opacity: 0; transform: translateY(10px) scale(.96); }
 }
 .np-toast { position: absolute; z-index: 4; left: 0; right: 0; bottom: calc(max(22px, env(safe-area-inset-bottom, 22px)) + 84px); width: fit-content; margin: 0 auto; display: flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 999px; background: rgba(24,31,35,.94); border: 1px solid rgba(255,255,255,.14); color: #fff; font-size: 13px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,.45); pointer-events: none; animation: np-toast 1600ms var(--ease-in-out) forwards; }
-@media (prefers-reduced-motion: reduce) { .np-queue-list.np-panel-in, .np-toast { animation-duration: 1ms; } .np-toast { animation-duration: 1600ms; animation-name: fade-in; } }
+@media (prefers-reduced-motion: reduce) { .np-queue-list.np-panel-in, .np-toast { animation: fade-in 120ms var(--ease-out) both; } }
 
 @keyframes np-slide-from-right { from { opacity: 0; transform: translateX(48px); } }
 @keyframes np-slide-from-left  { from { opacity: 0; transform: translateX(-48px); } }

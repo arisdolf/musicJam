@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
+import { useState, useCallback, useMemo, useRef, useEffect, lazy, Suspense } from 'react'
 import { FriendsProvider } from './features/friends/FriendsContext'
 import { getSimilarTracks } from './services/youtube'
 import InviteToasts from './components/InviteToasts'
@@ -9,18 +9,20 @@ import Topbar from './components/Topbar'
 import Sidenav from './components/Sidenav'
 import Home from './pages/Home'
 import BottomNav from './components/BottomNav'
+import { PageSkeleton } from './components/Skeleton'
 import AuthModal from './components/AuthModal'
-import JoinRoom from './components/JoinRoom'
-import MusicRoom from './components/MusicRoom'
-import Playlists from './pages/Playlists'
 import { playNow, replaceQueue, playNext } from './utils/queue'
 import { TopbarProvider } from './components/TopBarContext'
-import RecentRooms from './pages/RecentRooms'
-import Settings from './pages/Settings'
 import PersistentPlayer from './components/PersistentPlayer'
 import QueueFly from './components/QueueFly'
 import { useAccount } from './features/account/AccountContext'
 import ErrorBoundary from './components/ErrorBoundary'
+
+const JoinRoom = lazy(() => import('./components/JoinRoom'))
+const MusicRoom = lazy(() => import('./components/MusicRoom'))
+const Playlists = lazy(() => import('./pages/Playlists'))
+const RecentRooms = lazy(() => import('./pages/RecentRooms'))
+const Settings = lazy(() => import('./pages/Settings'))
 
 // ── Inner shell (needs AccountContext) ────────────────────────────────────────
 function Shell() {
@@ -33,7 +35,7 @@ function Shell() {
     playTracks: playLocalTracks,
     startVideo,
   } = usePlayback()
-  const [view, setView] = useState(() => new URLSearchParams(window.location.search).get('room') ? 'jam' : 'home')
+  const [view, setView] = useState(() => new URLSearchParams(window.location.search).get('room') ? 'create' : 'home')
   const [roomCode, setRoomCode] = useState(() => new URLSearchParams(window.location.search).get('room')?.toUpperCase() || '')
   const [settingsSection, setSettingsSection] = useState(null) // null | 'friends' | 'quota'
   const [queueFly, setQueueFly] = useState(null)
@@ -111,6 +113,7 @@ function Shell() {
 
   const animateQueueAdd = useCallback((track, trigger) => {
     if (!trigger?.getBoundingClientRect) return
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
     const source = trigger.getBoundingClientRect()
     const start = { x: source.left + source.width / 2, y: source.top + source.height / 2 }
     requestAnimationFrame(() => {
@@ -154,10 +157,6 @@ function Shell() {
     if (!roomCode) { updateLocalPlayback((state) => playNext(state, track)); return }
     updateRoom((state) => playNext(state, track))
   }, [roomCode, updateRoom, updateLocalPlayback])
-
-  const fallbackTitle = roomCode && view === 'create'
-  ? `Room ${roomCode}`
-  : ({ home: 'Home', create: 'Jam Room', playlists: 'Playlists', recent: 'Recent rooms', settings: 'Settings' }[view] || '')
 
   const queueTrack = useCallback((track, trigger) => {
     if (!track?.id) return
@@ -207,7 +206,7 @@ const renderContent = () => {
       <Sidenav view={view} onNavigate={navigate} />
 
       <div className="app-content">
-        <Topbar fallbackTitle={fallbackTitle} />
+        <Topbar onPlaySong={playWithSimilar} onQueueTrack={queueTrack} />
         
         <ErrorBoundary label="The player">
           <PersistentPlayer
@@ -225,7 +224,9 @@ const renderContent = () => {
         <div className="app-body">
           <ErrorBoundary label="This page" resetKey={`${view}:${roomCode || 'local'}`}>
             <div className="route-stage" key={`${view}:${roomCode || 'local'}`}>
-              {renderContent()}
+              <Suspense fallback={<PageSkeleton />}>
+                {renderContent()}
+              </Suspense>
             </div>
           </ErrorBoundary>
         </div>

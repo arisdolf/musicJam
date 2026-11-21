@@ -5,7 +5,6 @@
 @keyframes pop-in   { from { opacity: 0; transform: scale(var(--pop)) translateY(6px); } }
 @keyframes sheet-in { from { opacity: 0; transform: translateY(calc(var(--shift) * 2)); } }
 @keyframes pulse    { 0% { opacity: 0; transform: scale(.9); } 60% { opacity: 1; transform: scale(1.06); } }
-@keyframes spin     { to { transform: rotate(360deg); } }
 @keyframes popover-exit { to { opacity: 0; transform: scale(var(--pop)) translateY(4px); } }
 @keyframes panel-exit   { to { opacity: 0; transform: scale(var(--pop)) translateY(4px); } }
 @keyframes queue-fly-arc {

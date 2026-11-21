@@ -35,11 +35,9 @@ export default function Quota() {
       </div>
     </div>
 
-    <section className="quota-total">
-      <span className="eyebrow">{serverKeyOnly ? 'SERVER KEY' : 'ALL KEYS'}</span>
-      <strong>{totalUsed.toLocaleString()} <small>/ {totalLimit.toLocaleString()} units</small></strong>
-      <small>{available} of {keys.length} {keys.length === 1 ? 'key' : 'keys'} available</small>
-    </section>
+    <p className="quota-summary">
+      <strong>{serverKeyOnly ? 'Server key' : 'All keys'}</strong> · {totalUsed.toLocaleString()} of {totalLimit.toLocaleString()} units used · {available} of {keys.length} {keys.length === 1 ? 'key' : 'keys'} available
+    </p>
 
     <ul className="quota-list">
       {keys.map((key) => {

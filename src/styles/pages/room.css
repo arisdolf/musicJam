@@ -3,7 +3,7 @@
 .room-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .room-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 13px; color: var(--muted); }
 .dot { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; background: #c9a227; }
-.dot-connected { background: var(--accent); }
+.dot-connected { background: var(--live); }
 .dot-local { background: #b0b4b8; }
 .chip { padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); font-size: 12px; font-weight: 700; letter-spacing: .5px; display: inline-flex; align-items: center; gap: 4px; }
 .chip:hover { background: var(--surface); }
@@ -17,6 +17,11 @@
 
 .room-bar { flex-wrap: nowrap; }
 .room-meta-row { margin: -4px 0 14px; }
+.room-search-input { position: relative; margin-bottom: 4px; }
+.room-search-input input.search { padding-right: 48px; margin-bottom: 0; }
+.room-search-input .search-clear { position: absolute; top: 4px; right: 5px; width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); }
+.room-search-input .search-clear:hover:not(:disabled) { background: var(--surface); color: var(--ink); }
+.room-search-input .search-clear:disabled { opacity: .3; }
 
 .block-toggle { width: 100%; height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); font-size: 15px; font-weight: 700; }
 .block-toggle > span { display: flex; align-items: center; gap: 8px; }

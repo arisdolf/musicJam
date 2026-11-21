@@ -7,6 +7,11 @@
 
 /* route-stage is keyed in App.jsx, so it remounts on every tab change and replays this. */
 .route-stage { width: 100%; animation: enter var(--dur) var(--ease-out) backwards; }
+.page-loading { width: min(100%, 640px); margin: 0 auto; padding: 28px 16px; color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .route-stage { animation: none; }
+}
 
 .page { width: min(100%, 640px); margin: 0 auto; padding: 28px 16px 48px; }
 .page.narrow { width: min(100%, 520px); }

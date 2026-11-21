@@ -8,6 +8,7 @@ import InviteFriendsModal from './InviteFriendsModal'
 import { useTopbar } from './TopBarContext'
 import LikeButton from './LikeButton'
 import TrackMenu, { DotsMenu } from './TrackMenu'
+import { TrackSkeletonList } from './Skeleton'
 import { Play, Search, Music2, Check, X, Plus, Trash2, GripVertical, ListMusic, ListPlus, ChevronDown, LogOut, UserPlus, Sparkles } from 'lucide-react'
 
 export default function MusicRoom({ roomCode, room, updateRoom, connection, members, onLeave, onPlayTrack, onQueueTrack, onPlayTracks, onQueueTracks, onPlayNext }) {
@@ -146,9 +147,12 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
     </div>
     <section className="block">
       <h2><Search size={17} /> Add a song</h2>
-      <input className="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search songs or artists" aria-label="Search songs or artists" />
+      <div className="room-search-input">
+        <input className="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search songs or artists" aria-label="Search songs or artists" />
+        <button type="button" className="search-clear" onClick={() => setQuery('')} disabled={!query} aria-label="Clear song search"><X size={17} /></button>
+      </div>
       {query && <div className="results">
-        {searching ? <p className="message">Searching…</p>
+        {searching ? <TrackSkeletonList count={3} className="search-skeleton" />
           : searchError ? <p className="message">{searchError}</p>
 
             : results.map((track) => <SongRow key={track.id} track={track} queued={queueIds.includes(track.id)} onPlayTrack={onPlayTrack} onPlayNext={onPlayNext} onQueueTrack={onQueueTrack} />)}
@@ -160,7 +164,7 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
         {similar.tracks.length > 0 && <button className="btn btn-small" onClick={() => onQueueTracks(similar.tracks)}><ListPlus size={14} /> Add all</button>}
       </div>
       <div className="results similar-results">
-        {similar.loading ? <p className="message">Finding songs with the same vibe…</p>
+        {similar.loading ? <TrackSkeletonList count={3} className="search-skeleton" />
           : similar.error ? <p className="message">{similar.error}</p>
             : similar.tracks.map((track) => <SongRow key={track.id} track={track} queued={queueIds.includes(track.id)} onPlayTrack={onPlayTrack} onPlayNext={onPlayNext} onQueueTrack={onQueueTrack} />)}
       </div>
@@ -197,7 +201,7 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
             >
               <span className="queue-drag-handle" {...queueDrag.handleProps(index)} title="Drag to reorder" aria-label={`Drag ${track.title} to reorder`}><GripVertical size={17} /></span>
               <button className={`queue-thumb${isCurrent ? ' is-playing' : ''}`} onClick={() => onPlayTrack(track)} aria-label={`Play ${track.title}`}>
-                <img src={track.thumbnail} alt="" />
+                <img src={track.thumbnail} alt="" loading="lazy" decoding="async" />
                 {isCurrent && <span className={`eq-bars${room.playing ? '' : ' paused'}`} aria-hidden="true"><i /><i /><i /></span>}
               </button>
               <button className="track-text as-button" onClick={() => onPlayTrack(track)}><strong>{track.title}</strong><small>{track.artist}</small></button>
@@ -259,7 +263,7 @@ function RoomPlaylists({ onPlayTracks, onQueueTracks, onPlayTrack, onQueueTrack 
     </div>
   }
   if (playlistsError) return <p className="message">{playlistsError}</p>
-  if (!playlistsReady) return <p className="message">Loading your playlists…</p>
+  if (!playlistsReady) return <TrackSkeletonList count={3} className="search-skeleton" />
   if (!playlists.length) return <p className="empty">You have no playlists yet. Save songs with the heart button.</p>
 
   return <ul className="track-list room-playlists">
@@ -291,7 +295,7 @@ function RoomPlaylists({ onPlayTracks, onQueueTracks, onPlayTrack, onQueueTrack 
 
 function SongRow({ track, queued, onPlayTrack, onPlayNext, onQueueTrack }) {
   return <div className="track">
-    <img src={track.thumbnail} alt="" />
+    <img src={track.thumbnail} alt="" loading="lazy" decoding="async" />
     <div className="track-text"><strong>{track.title}</strong><small>{track.artist}</small></div>
     <div className="track-actions">
       <LikeButton track={track} />

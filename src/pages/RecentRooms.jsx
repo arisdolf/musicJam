@@ -2,26 +2,7 @@
 // Shows rooms the user has visited, stored in localStorage.
 import { useMemo } from 'react'
 import { History, ArrowRight, Trash2 } from 'lucide-react'
-
-const STORAGE_KEY = 'jamroom:recent'
-const MAX = 10
-
-export function saveRecentRoom(code) {
-  try {
-    const list = getRecentRooms().filter(r => r.code !== code)
-    list.unshift({ code, visitedAt: Date.now() })
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list.slice(0, MAX)))
-  } catch { /* storage disabled */ }
-}
-
-export function getRecentRooms() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]') }
-  catch { return [] }
-}
-
-function clearRecent() {
-  try { localStorage.removeItem(STORAGE_KEY) } catch { /* noop */ }
-}
+import { clearRecentRooms, getRecentRooms } from '../utils/recentRooms'
 
 export default function RecentRooms({ onJoin }) {
   const rooms = useMemo(() => getRecentRooms(), [])
@@ -33,7 +14,7 @@ export default function RecentRooms({ onJoin }) {
           <History size={22} />
           <div><h1>Recent Rooms</h1><p className="muted">Rooms you've visited will appear here.</p></div>
         </div>
-        <p className="empty">No recent rooms yet. Create or join a room from the home page.</p>
+        <p className="empty">No recent rooms yet. Create or join one from Jam Room.</p>
       </main>
     )
   }
@@ -67,7 +48,7 @@ export default function RecentRooms({ onJoin }) {
         ))}
       </ul>
 
-      <button className="btn btn-text btn-small danger-text" onClick={() => { clearRecent(); window.location.reload() }}>
+      <button className="btn btn-text btn-small danger-text" onClick={() => { clearRecentRooms(); window.location.reload() }}>
         <Trash2 size={14} /> Clear history
       </button>
     </main>

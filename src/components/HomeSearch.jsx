@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, Loader, Play, Plus, Search, X } from 'lucide-react'
+import { Check, Play, Plus, Search, X } from 'lucide-react'
 import { quickSearch, getTrackDetails } from '../services/youtube'
+import { Skeleton, TrackSkeletonList } from './Skeleton'
 
 import LikeButton from './LikeButton'
 import TrackMenu from './TrackMenu'
@@ -9,7 +10,7 @@ const IDLE = { query: '', status: 'idle', results: [], error: '' }
 const DEBOUNCE_MS = 300   // wait this long after the last keystroke
 const MIN_CHARS = 3       // don't search for 1 or 2 letters
 
-export default function HomeSearch({ onPlaySong, onQueueTrack }) {
+export default function HomeSearch({ onPlaySong, onQueueTrack, className = '' }) {
     const [open, setOpen] = useState(false)
     const [query, setQuery] = useState('')
     const [state, setState] = useState(IDLE)
@@ -48,6 +49,15 @@ export default function HomeSearch({ onPlaySong, onQueueTrack }) {
         setQueuedIds([])
     }
 
+    const clearQuery = () => {
+        setQuery('')
+        setState(IDLE)
+        setQueuedIds([])
+        inputRef.current?.focus()
+    }
+
+    const clearOrClose = () => query.trim() ? clearQuery() : closeBar()
+
     // Enter still works: it just blurs the input so the phone keyboard closes.
     const submit = (event) => {
         event.preventDefault()
@@ -71,9 +81,9 @@ export default function HomeSearch({ onPlaySong, onQueueTrack }) {
     const error = waiting ? '' : state.error
     const showPanel = open && q.length >= MIN_CHARS && (results.length > 0 || waiting || Boolean(error))
 
-    return <div className="home-search">
+    return <div className={`home-search${className ? ` ${className}` : ''}${open ? ' is-open' : ''}`}>
         <div className={`hs-bar${open ? ' open' : ''}`}>
-            <button type="button" className="hs-toggle" onClick={open ? () => inputRef.current?.focus() : openBar} aria-label="Search songs" aria-expanded={open}>
+            <button type="button" className="hs-toggle" onClick={open ? closeBar : openBar} aria-label={open ? 'Close search' : 'Search songs'} aria-expanded={open}>
                 <Search size={19} />
             </button>
             <form className="hs-form" onSubmit={submit} role="search">
@@ -88,24 +98,24 @@ export default function HomeSearch({ onPlaySong, onQueueTrack }) {
                     autoComplete="off"
                     tabIndex={open ? 0 : -1}
                 />
-                <button type="button" className="icon-btn" onClick={closeBar} aria-label="Close search" tabIndex={open ? 0 : -1}><X size={18} /></button>
+                <button type="button" className="icon-btn hs-clear" onClick={clearOrClose} aria-label={query.trim() ? 'Clear search' : 'Close search'} tabIndex={open ? 0 : -1}><X size={18} /></button>
             </form>
         </div>
 
         {showPanel && <div className={`results hs-results${waiting ? ' is-stale' : ''}`}>
-            {waiting && !results.length && <p className="message"><Loader size={14} className="spin" /> Searching…</p>}
+            {waiting && !results.length && <TrackSkeletonList count={3} className="search-skeleton" />}
             {error && <p className="message">{error}</p>}
             {results.map((track) => {
                 const queued = queuedIds.includes(track.id)
                 return <div className={`track hs-row${busyId === track.id ? ' is-busy' : ''}`} key={track.id}>
-                    <img src={track.thumbnail} alt="" />
+                    <img src={track.thumbnail} alt="" loading="lazy" decoding="async" />
                     <button className="track-text as-button" onClick={() => choose(track)} disabled={Boolean(busyId)}>
                         <strong>{track.title}</strong><small>{track.artist}</small>
                     </button>
                     <div className="track-actions">
                         <LikeButton track={track} />
                         <button className="icon-btn" onClick={() => choose(track)} disabled={Boolean(busyId)} aria-label={`Play ${track.title}`} title="Play now">
-                            {busyId === track.id ? <Loader size={16} className="spin" /> : <Play size={16} fill="currentColor" />}
+                            {busyId === track.id ? <Skeleton className="skeleton-button" /> : <Play size={16} fill="currentColor" />}
                         </button>
                         <button className="icon-btn add-btn" onClick={(event) => queue(track, event.currentTarget)} disabled={queued} aria-label={`Add ${track.title} to queue`} title={queued ? 'In queue' : 'Add to queue'}>
                             {queued ? <Check size={16} /> : <Plus size={17} />}

@@ -29,6 +29,7 @@ export default function BottomNav({ view, onNavigate }) {
         <button
           key={id}
           className={`bottom-nav-item${view === id ? ' active' : ''}`}
+          aria-current={view === id ? 'page' : undefined}
           onClick={() => onNavigate(id)}
         >
           <Icon size={22} />

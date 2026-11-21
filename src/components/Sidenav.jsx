@@ -1,6 +1,6 @@
 import { useAccount } from '../features/account/AccountContext'
 import { useFriends } from '../features/friends/FriendsContext'
-import { Music2, Home, ListMusic, History, Settings,  Headset, Headphones} from 'lucide-react'
+import { Music2, Home, ListMusic, History, Settings, Headphones } from 'lucide-react'
 
 const NAV = [
   { id: 'home',      label: 'Home',         icon: Home },
@@ -25,7 +25,7 @@ export default function Sidenav({ view, onNavigate }) {
       <ul className="sidenav-nav">
         {visibleNav.map(({ id, label, icon: Icon }) => (
           <li key={id}>
-            <button className={`sidenav-item${view === id ? ' active' : ''}`} onClick={() => onNavigate(id)}>
+            <button className={`sidenav-item${view === id ? ' active' : ''}`} aria-current={view === id ? 'page' : undefined} onClick={() => onNavigate(id)}>
               <Icon size={19} />
               <span>{label}</span>
               {id === 'settings' && pendingCount > 0 && <span className="nav-badge">{pendingCount}</span>}

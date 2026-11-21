@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Check, Flame, Loader, Play, Plus, RotateCw, Trash2} from 'lucide-react'
-import HomeSearch from '../components/HomeSearch'
+import { Check, Flame, Play, Plus, RotateCw, Trash2} from 'lucide-react'
 import LikeButton from '../components/LikeButton'
+import { TrackSkeletonList } from '../components/Skeleton'
 import { getTrending } from '../services/youtube'
 import TrackMenu from '../components/TrackMenu'
 export default function Home({ onPlaySong, onQueueTrack, onPlayTracks }) {
@@ -31,19 +31,17 @@ export default function Home({ onPlaySong, onQueueTrack, onPlayTracks }) {
   const { loading, tracks, error } = state
 
   return <main className="page home-page">
-    <HomeSearch onPlaySong={onPlaySong} onQueueTrack={onQueueTrack} />
-
     <div className="block-head">
       <div>
-        <span className="eyebrow"><Flame size={12} /> TRENDING IN THE PHILIPPINES</span>
         <h1>Top 25 songs</h1>
+        <p className="home-chart-location"><Flame size={14} /> Trending in the Philippines</p>
       </div>
       {tracks.length > 0 && <button className="btn btn-small btn-primary" onClick={() => onPlayTracks(tracks, 0)}>
         <Play size={14} fill="currentColor" /> Play all
       </button>}
     </div>
 
-    {loading && <p className="message"><Loader size={14} className="spin" /> Loading trending songs…</p>}
+    {loading && <TrackSkeletonList count={5} />}
     {!loading && error && <div className="empty-result-card">
       <span>{error}</span>
       <button className="btn btn-small" onClick={retry}><RotateCw size={14} /> Try again</button>

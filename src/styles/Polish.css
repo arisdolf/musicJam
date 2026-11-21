@@ -17,7 +17,8 @@
   --accent-hover: oklch(0.405 0.156 24);
   --accent-soft: oklch(0.942 0.023 11);
   --accent-2: oklch(0.592 0.18 27);
-  --live: oklch(0.623 0.147 156);
+  --live: oklch(0.42 0.13 154);
+  --live-soft: oklch(0.95 0.04 155);
   --danger: oklch(0.593 0.193 36);
   --danger-hover: oklch(0.524 0.173 36);
   --danger-bg: oklch(0.984 0.009 45);
@@ -38,7 +39,8 @@
     --accent-hover: oklch(0.471 0.174 23);
     --accent-soft: oklch(0.214 0.043 14);
     --accent-2: oklch(0.759 0.144 26);
-    --live: oklch(0.818 0.164 159);
+    --live: oklch(0.8 0.15 155);
+    --live-soft: oklch(0.25 0.05 155);
     --danger: oklch(0.783 0.136 46);
     --danger-hover: oklch(0.824 0.106 46);
     --danger-bg: oklch(0.222 0.037 31);
@@ -59,7 +61,8 @@
   --accent-hover: oklch(0.471 0.174 23);
   --accent-soft: oklch(0.214 0.043 14);
   --accent-2: oklch(0.759 0.144 26);
-  --live: oklch(0.818 0.164 159);
+  --live: oklch(0.8 0.15 155);
+  --live-soft: oklch(0.25 0.05 155);
   --danger: oklch(0.783 0.136 46);
   --danger-hover: oklch(0.824 0.106 46);
   --danger-bg: oklch(0.222 0.037 31);
@@ -100,7 +103,7 @@
 .mini-player { --r: 22px; --pad: 6px; border-radius: var(--r); }
 .mini-open img { border-radius: calc(var(--r) - var(--pad)); }
 
-.playlist-card { --r: 20px; border-radius: var(--r); }
+.playlist-card { --r: 16px; border-radius: var(--r); }
 .playlist-card-open { --pad: 10px; padding: var(--pad); grid-template-columns: 68px minmax(0, 1fr) 34px; }
 .playlist-card-open .playlist-cover { border-radius: calc(var(--r) - var(--pad)); }
 
@@ -171,28 +174,16 @@ button, a, input, [role="button"], [role="checkbox"] { touch-action: manipulatio
 .np-pager button::after { content: ""; position: absolute; inset: -9px -5px; }
 .btn-small::after { content: ""; position: absolute; inset: -5px 0; }
 
-/* Exaggerated feedback: an error should be impossible to miss, so it shakes once. */
-@keyframes shake {
-  20%, 60% { transform: translateX(-5px); }
-  40%, 80% { transform: translateX(5px); }
-  100% { transform: none; }
-}
-.form-error, .popover-status.error { animation: shake 360ms var(--ease-out); }
-
-/* Follow through: the heart overshoots a little and settles, like a real object would. */
+/* Brief feedback marks a save without an overshoot. */
 @keyframes heart-pop {
-  0%   { transform: scale(.8); opacity: 0; }
-  55%  { transform: scale(1.22); opacity: 1; }
-  100% { transform: scale(1); }
+  from { transform: scale(.94); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }
 
 /* Everything above that moves respects reduced motion. */
 @media (prefers-reduced-motion: reduce) {
   .form-error, .popover-status.error, .motion-icon { animation: none; }
 }
-
-/* Remove the red accent strip from the top of modals and cards. */
-.modal::before, .feedback-card::before { display: none; }
 
 /* ── Lyric window (cover mode): show the whole current line ── */
 .np-lyric-window { height: auto; min-height: 88px; max-height: 150px; flex: 0 1 auto; justify-content: center; overflow: hidden; }
@@ -205,8 +196,7 @@ button, a, input, [role="button"], [role="checkbox"] { touch-action: manipulatio
 
 /* ── Song rows: compact action groups ── */
 .track-actions, .queue-actions { display: flex; align-items: center; flex: none; }
-.track-actions .icon-btn, .queue-actions .icon-btn { width: 34px; height: 34px; }
-@media (max-width: 480px) { .track-actions .icon-btn, .queue-actions .icon-btn { width: 30px; height: 30px; } }
+.track-actions .icon-btn, .queue-actions .icon-btn { width: 36px; height: 36px; }
 
 /* ── Room queue row ── */
 .queue-track { gap: 6px; }
@@ -224,16 +214,11 @@ button, a, input, [role="button"], [role="checkbox"] { touch-action: manipulatio
 @keyframes eq-bounce { 0%, 100% { transform: scaleY(.3); } 25% { transform: scaleY(1); } 50% { transform: scaleY(.5); } 75% { transform: scaleY(.85); } }
 @media (prefers-reduced-motion: reduce) { .eq-bars { animation: none; } }
 
-/* ── Hide scrollbars everywhere (scrolling still works) ── */
-* {
-  scrollbar-width: none;          /* Firefox */
-  -ms-overflow-style: none;       /* old Edge */
-}
-*::-webkit-scrollbar {
-  display: none;                  /* Chrome, Safari, Edge, Android */
-  width: 0;
-  height: 0;
-}
+/* Quiet, visible scrollbars keep overflow discoverable without breaking the theme. */
+* { scrollbar-color: color-mix(in srgb, var(--muted) 45%, transparent) transparent; scrollbar-width: thin; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: color-mix(in srgb, var(--muted) 45%, transparent); background-clip: padding-box; }
 
 /* ── Raise the prev / play / next row ── */
 .np-controls {

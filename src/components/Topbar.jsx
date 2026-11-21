@@ -1,16 +1,17 @@
 import { ArrowLeft } from 'lucide-react'
 import { useAccount } from '../features/account/AccountContext'
 import { useTopbarValue } from './TopBarContext'
+import HomeSearch from './HomeSearch'
 
-export default function Topbar({ fallbackTitle }) {
+export default function Topbar({ onPlaySong, onQueueTrack }) {
   const { user, openAuth } = useAccount()
-  const { title, onBack } = useTopbarValue()
+  const { onBack } = useTopbarValue()
   return (
-    <header className={`topbar${user ? '' : ' topbar-guest'}`}>
+    <header className={`topbar${user ? '' : ' topbar-guest'}${onBack ? ' topbar-has-back' : ''}`}>
       <div className="topbar-side">
         {onBack && <button className="icon-btn topbar-back" onClick={onBack} aria-label="Back"><ArrowLeft size={20} /></button>}
       </div>
-      <div className="topbar-title">{title || fallbackTitle}</div>
+      <HomeSearch className="topbar-search" onPlaySong={onPlaySong} onQueueTrack={onQueueTrack} />
       <div className="topbar-side topbar-side-end">
         {!user && <div className="topbar-auth">
           <button className="btn btn-text btn-small" onClick={() => openAuth('login')}>Log in</button>

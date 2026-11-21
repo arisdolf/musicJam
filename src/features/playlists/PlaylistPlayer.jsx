@@ -19,7 +19,7 @@ export default function PlaylistPlayer({ track, position, count, onPrevious, onN
     <div className="inline-player-bar">
       <div className="inline-player-info">
         <span className="now-playing-icon"><Music2 size={17} /></span>
-        <div><span className="eyebrow">NOW PLAYING · {position + 1} OF {count}</span><strong title={track.title}>{track.title}</strong><small>{track.artist}</small></div>
+        <div><span className="now-playing-status">Now playing · {position + 1} of {count}</span><strong title={track.title}>{track.title}</strong><small>{track.artist}</small></div>
       </div>
       <div className="inline-player-controls">
         <button className="icon-btn" onClick={onPrevious} disabled={position <= 0} aria-label="Play previous song"><SkipBack size={17} /></button>

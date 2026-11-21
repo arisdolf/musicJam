@@ -3,4 +3,6 @@
 .home > .muted { margin: 0 0 28px; }
 .home-icon { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 18px; border-radius: 14px; color: var(--accent-dark); background: var(--accent-soft); }
 .inline-form { display: flex; gap: 8px; margin: 20px 0 8px; }
+.home-chart-location { display: flex; align-items: center; gap: 6px; margin: 5px 0 0; color: var(--muted); font-size: 13px; }
+.home-chart-location svg { color: var(--accent-2); }
 @media (max-width: 480px) { .home { padding-top: 32px; } }

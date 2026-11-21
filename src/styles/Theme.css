@@ -11,8 +11,7 @@ h2,
 .sidenav-logo,
 .topbar-logo,
 .np-title strong,
-.recent-code,
-.quota-total strong {
+.recent-code {
   font-family: var(--font-display);
 }
 
@@ -25,10 +24,6 @@ body::before {
   background:
     radial-gradient(60vw 40vw at 90% -10%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
     radial-gradient(50vw 40vw at -10% 110%, color-mix(in srgb, var(--live) 10%, transparent), transparent 70%);
-}
-
-.eyebrow {
-  color: var(--accent-2);
 }
 
 /* ── Buttons, logo, icons ── */
@@ -46,7 +41,7 @@ body::before {
 }
 
 .btn:hover:not(:disabled) {
-  transform: translateY(-1px);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .btn:active:not(:disabled) {
@@ -84,7 +79,7 @@ input:focus {
 
 /* ── Navigation ── */
 .sidenav-item.active {
-  box-shadow: inset 3px 0 0 var(--accent);
+  background: var(--accent-soft);
 }
 
 .sidenav-item.active svg {
@@ -94,10 +89,6 @@ input:focus {
 .bottom-nav {
   background: color-mix(in srgb, var(--bg) 88%, transparent);
   backdrop-filter: blur(16px);
-}
-
-.bottom-nav-item.active svg {
-  animation: heart-pop 300ms var(--spring);
 }
 
 .topbar {
@@ -113,7 +104,6 @@ input:focus {
   background: var(--spot);
   color: #fff;
   box-shadow: var(--glow);
-  animation: pulse-ring 2.8s ease-in-out infinite;
 }
 
 .home-icon svg {
@@ -127,18 +117,6 @@ input:focus {
 .np-overlay {
   backdrop-filter: blur(8px);
   overflow: hidden;
-}
-
-.modal::before,
-.feedback-card::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: 4px;
-  border-radius: inherit;
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-  background: var(--spot);
 }
 
 .modal {
@@ -179,10 +157,6 @@ input:focus {
   animation: pop-origin 300ms var(--spring) backwards;
 }
 
-.popover-item:hover:not(:disabled) {
-  transform: translateX(3px);
-}
-
 .popover-item[aria-checked="true"] .popover-check {
   background: var(--accent);
   color: #fff;
@@ -207,7 +181,7 @@ input:focus {
 
 /* ── Tracks ── */
 .track.active {
-  box-shadow: inset 3px 0 0 var(--accent);
+  background: var(--accent-soft);
 }
 
 .track.active .track-text strong {
@@ -338,7 +312,6 @@ input:focus {
 
 .np-queue-list li.current {
   background: rgba(255, 255, 255, .12);
-  box-shadow: inset 3px 0 0 #e0343f;
 }
 
 .np-queue-list li {
@@ -353,12 +326,10 @@ input:focus {
 }
 
 /* ── Playlists ── */
-.playlist-card {
-  border-radius: 20px;
-}
+.playlist-card { border-radius: 16px; }
 
 .playlist-card:hover {
-  transform: translateY(-4px);
+  border-color: var(--accent);
 }
 
 .playlist-card-play {
@@ -379,10 +350,6 @@ input:focus {
   background: linear-gradient(125deg, color-mix(in srgb, var(--accent) 18%, var(--bg)), var(--bg) 72%);
 }
 
-.playlist-empty-state>svg {
-  animation: spin 9s linear infinite;
-}
-
 .import-progress span {
   background: var(--spot);
 }
@@ -398,7 +365,7 @@ input:focus {
 }
 
 .quota-card.is-ok .quota-badge {
-  background: color-mix(in srgb, var(--live) 18%, transparent);
+  background: var(--live-soft);
   color: var(--live);
 }
 
@@ -457,10 +424,8 @@ input:focus {
 }
 
 @keyframes heart-pop {
-  from {
-    opacity: 0;
-    transform: scale(.8);
-  }
+  from { opacity: 0; transform: scale(.92); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 @keyframes icon-swap {
@@ -493,12 +458,6 @@ input:focus {
   }
 }
 
-@keyframes pulse-ring {
-  50% {
-    box-shadow: var(--glow), 0 0 0 12px color-mix(in srgb, var(--accent) 16%, transparent), 0 0 0 26px color-mix(in srgb, var(--accent) 5%, transparent);
-  }
-}
-
 @keyframes eq {
 
   0%,
@@ -518,9 +477,7 @@ input:focus {
 @media (prefers-reduced-motion: reduce) {
 
   .queue-track.active::after,
-  .home-icon,
-  .dot-connected,
-  .playlist-empty-state>svg {
+  .dot-connected {
     animation: none;
   }
 }

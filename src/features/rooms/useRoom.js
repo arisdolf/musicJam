@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ref, onValue, set, remove, onDisconnect } from 'firebase/database'
 import { db } from '../../services/firebase'
-import { saveRecentRoom } from '../../pages/RecentRooms'
+import { saveRecentRoom } from '../../utils/recentRooms'
 
 // position = seconds into the current song at the moment `syncedAt` (server clock, ms).
 // Anyone can work out "where the song is now" as: position + (serverNow - syncedAt) while playing.

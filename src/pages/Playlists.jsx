@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { useAccount } from '../features/account/AccountContext'
-import { ArrowLeft, Heart, Check, Disc3, ListMusic, Music2, Pencil, Play, Plus, Search, Trash2, X, ListPlus, Upload, Loader } from 'lucide-react'
+import { ArrowLeft, Heart, Check, Disc3, ListMusic, Music2, Pencil, Play, Plus, Search, Trash2, X, ListPlus, Upload } from 'lucide-react'
+import { Skeleton } from '../components/Skeleton'
 import FeedbackModal from '../components/FeedbackModal'
 import ConfirmModal from '../components/ConfirmModal'
 import { layoutTransitionName, withViewTransition } from '../utils/viewTransitions'
@@ -37,7 +38,7 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
       <section className="playlist-empty-state">
         <Disc3 size={34} />
         <h2>Make your own music library</h2>
-        <p className="muted">Sign in to create playlists and save tracks from Explore and your rooms.</p>
+        <p className="muted">Sign in to create playlists and save tracks from Home and your rooms.</p>
         <button className="btn btn-primary" onClick={() => openAuth('signup')}><Music2 size={16} /> Sign up or log in</button>
       </section>
     </main>
@@ -183,7 +184,6 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
           {selected.tracks.length === 0 && <Music2 size={34} />}
         </div>
         <div className="playlist-detail-copy">
-          <span className="eyebrow">PLAYLIST</span>
           {editing
             ? <form className="playlist-rename-form" onSubmit={saveName}>
               <input value={editName} onChange={(event) => setEditName(event.target.value)} aria-label="Playlist name" maxLength={60} autoFocus />
@@ -233,9 +233,9 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
 
     <FeedbackModal title="Playlist update failed" message={error} onClose={() => setError('')} />
     {deleteTarget && <ConfirmModal title={`Delete “${deleteTarget.name}”?`} message="This permanently removes the playlist and its saved songs." busy={busy} onCancel={() => setDeleteTarget(null)} onConfirm={confirmDelete} />}
-    {playlists.length > 0 && <label className="playlist-search"><Search size={17} /><span className="sr-only">Search playlists</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search your playlists" /></label>}
+    {playlists.length > 0 && <label className="playlist-search"><Search size={17} /><span className="sr-only">Search playlists</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search your playlists" /><button type="button" className="search-clear" onClick={() => setSearch('')} disabled={!search} aria-label="Clear playlist search"><X size={17} /></button></label>}
     {playlists.length === 0
-      ? <section className="playlist-empty-state"><Disc3 size={34} /><h2>Your library starts here</h2><p className="muted">Create a playlist, then save songs from Explore or your music rooms.</p><button className="btn btn-text" onClick={onBrowse}><Search size={16} /> Find songs</button></section>
+      ? <section className="playlist-empty-state"><Disc3 size={34} /><h2>Your library starts here</h2><p className="muted">Create a playlist, then save songs from Home or your rooms.</p><button className="btn btn-text" onClick={onBrowse}><Search size={16} /> Find songs</button></section>
       : visiblePlaylists.length === 0
         ? <p className="empty">No playlists match “{search}”.</p>
         : <div className="playlist-grid">
@@ -261,7 +261,7 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
     {importState && <div className="feedback-overlay">
       <section className="feedback-card" role="alertdialog" aria-modal="true" aria-labelledby="import-title">
         <span className="feedback-icon">
-          {importState.status === 'done' ? <Check size={21} /> : importState.status === 'error' ? <X size={21} /> : <Loader size={21} className="spin" />}
+          {importState.status === 'done' ? <Check size={21} /> : importState.status === 'error' ? <X size={21} /> : <Skeleton className="skeleton-import-icon" />}
         </span>
         <h2 id="import-title">
           {importState.status === 'done' ? 'Playlist imported' : importState.status === 'error' ? 'Import failed' : `Importing “${importState.name}”`}

@@ -5,8 +5,8 @@
 .track.active { background: var(--accent-soft); border-radius: var(--radius); border-bottom-color: transparent; }
 .track img { width: 52px; height: 38px; flex-shrink: 0; object-fit: cover; border-radius: 6px; background: var(--surface); }
 .track-text { min-width: 0; flex: 1; display: flex; flex-direction: column; text-align: left; }
-.track-text strong { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.track-text small { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.track-text strong { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.track-text small { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .as-button { border: 0; background: none; padding: 0; }
 .track-play { width: 24px; flex-shrink: 0; border: 0; background: none; color: var(--muted); display: grid; place-items: center; }
 .track.active .track-play, .track-play.is-selected { color: var(--accent-dark); }

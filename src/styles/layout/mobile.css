@@ -6,18 +6,16 @@
   .home-icon { margin-inline: auto; }
   .inline-form input { text-align: center; }
 
-  /* Page headers: icon above title, both centred */
+  /* Keep page titles readable and aligned across mobile routes. */
   .explore-header,
-  .playlist-page-heading { flex-direction: column; align-items: center; gap: 10px; text-align: center; }
-  .explore-header > svg { margin-top: 0; }
-  .settings-page h1 { text-align: center; }
+  .playlist-page-heading { flex-direction: row; align-items: center; gap: 12px; text-align: left; }
+  .explore-header > svg { margin-top: 3px; }
+  .settings-page h1 { text-align: left; }
 
   /* Playlist detail hero */
-  .playlist-detail-hero { align-items: center; text-align: center; }
+  .playlist-detail-hero { align-items: flex-start; text-align: left; }
   .playlist-detail-actions,
   .playlist-title-row,
-  .playlist-rename-form { justify-content: center; }
+  .playlist-rename-form { justify-content: flex-start; }
 
-  /* Quota summary */
-  .quota-total { align-items: center; text-align: center; }
 }

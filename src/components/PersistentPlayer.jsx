@@ -10,9 +10,10 @@ import { playNext } from '../utils/queue'
 import LikeButton from './LikeButton'
 import TrackMenu from './TrackMenu'
 import ConfirmModal from './ConfirmModal'
+import { LyricsSkeleton, Skeleton } from './Skeleton'
 import {
-  ArrowLeft, Check, ChevronDown, Disc3, GripVertical, ListMusic, ListOrdered, Loader, LogIn, Mic2, MicOff, Minus, MoreVertical,
-  Pause, Play, Plus, Repeat1, Search, Shuffle, SkipBack, SkipForward, Timer, TimerOff, Trash2, ListStart, ListPlus
+  ArrowLeft, Check, ChevronDown, Disc3, GripVertical, ListMusic, ListOrdered, LogIn, Mic2, MicOff, Minus, MoreVertical,
+  Pause, Play, Plus, Repeat1, Search, Shuffle, SkipBack, SkipForward, Timer, TimerOff, Trash2, ListStart, ListPlus, X
 } from 'lucide-react'
 
 // 1 second of silence. Looping it keeps the phone treating this page as "playing media".
@@ -868,7 +869,7 @@ const moreRef = useRef(null)
               >
                 <span className="np-drag-handle" {...queueDrag.handleProps(index)} title="Drag to reorder" aria-label={`Drag ${track.title} to reorder`}><GripVertical size={17} /></span>
                 <button className="np-queue-track" onClick={() => playIndex(index)}>
-                  <img src={track.thumbnail || `https://i.ytimg.com/vi/${track.id}/mqdefault.jpg`} alt="" />
+                  <img src={track.thumbnail || `https://i.ytimg.com/vi/${track.id}/mqdefault.jpg`} alt="" loading="lazy" decoding="async" />
                   <span><strong>{track.title}</strong><small>{track.artist}</small></span>
                 </button>
                 <LikeButton track={track} />
@@ -900,7 +901,7 @@ const moreRef = useRef(null)
                         <button onClick={() => nudgeOffset(OFFSET_STEP)} aria-label="Show lyrics later" title="Lyrics early? Show them later"><Plus size={13} /></button>
                       </div>}
                     </div>
-                    {lyricsLoading && <p className="np-lyrics-note"><Loader size={15} className="spin" /> Loading lyrics…</p>}
+                    {lyricsLoading && <div className="np-lyrics-note"><LyricsSkeleton /></div>}
                     {!lyricsLoading && lyricsError && <p className="np-lyrics-note">{lyricsError}</p>}
                     {!lyricsLoading && !lyricsError && <div className="np-lyrics-list" ref={lyricsListRef} onWheel={(event) => rubberBandAtBounds(event.currentTarget, event.deltaY)}>
                       {lyricLines.map((line, index) => <p
@@ -935,7 +936,7 @@ const moreRef = useRef(null)
 
               {showLyrics && !lyricsFullOn && <div className="np-lyric-window" aria-live="off">
                 {lyricsLoading
-                  ? <p className="current"><Loader size={15} className="spin" /> Loading lyrics…</p>
+                  ? <LyricsSkeleton />
                   : lyricsError
                     ? <p>{lyricsError}</p>
                     : windowLines.map((text, slot) => <p key={`${activeLyricIndex}:${slot}`} className={slot === 1 ? `current${text.length > 70 ? ' long' : ''}` : ''}>{text}</p>)}
@@ -1075,6 +1076,7 @@ function findLyricIndex(lines, currentTime) {
 
 function SongSearch({ queuedIds, onPlay, onQueue, onPlayNext }) {
   const [query, setQuery] = useState('')
+  const inputRef = useRef(null)
   const [state, setState] = useState({ query: '', results: [], searching: false, error: '' })
   const q = query.trim()
   const hasResult = state.query === q
@@ -1102,22 +1104,29 @@ function SongSearch({ queuedIds, onPlay, onQueue, onPlayNext }) {
   }, [q])
 
   return <div className="np-search">
-    <input
-      value={query}
-      onChange={(event) => setQuery(event.target.value)}
-      placeholder="Search songs or artists"
-      aria-label="Search songs or artists"
-      autoFocus
-    />
+    <div className="np-search-input">
+      <input
+        ref={inputRef}
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder="Search songs or artists"
+        aria-label="Search songs or artists"
+        autoFocus
+      />
+      <button type="button" className="np-search-clear" onClick={() => { setQuery(''); inputRef.current?.focus() }} disabled={!query} aria-label="Clear song search"><X size={17} /></button>
+    </div>
     <ul className="np-queue-list" onWheel={(event) => rubberBandAtBounds(event.currentTarget, event.deltaY)}>
       {!q && <li className="np-search-note">Type a song or artist to add it.</li>}
-      {searching && <li className="np-search-note"><Loader size={15} className="spin" /> Searching…</li>}
+      {searching && Array.from({ length: 3 }, (_, index) => <li className="np-search-loading" key={`search-skeleton-${index}`} aria-hidden="true">
+        <Skeleton className="np-search-cover" />
+        <span className="np-search-copy"><Skeleton /><Skeleton /></span>
+      </li>)}
       {!searching && error && <li className="np-search-note">{error}</li>}
       {!searching && results.map((track) => {
         const queued = queuedIds.includes(track.id)
         return <li key={track.id}>
           <button className="np-queue-track" onClick={() => onPlay?.(track)}>
-            <img src={track.thumbnail} alt="" />
+            <img src={track.thumbnail} alt="" loading="lazy" decoding="async" />
             <span><strong>{track.title}</strong><small>{track.artist}</small></span>
           </button>
           <button className="np-icon small" onClick={() => onPlayNext?.(track)} aria-label={`Play ${track.title} next`} title="Play next"><ListStart size={16} /></button>

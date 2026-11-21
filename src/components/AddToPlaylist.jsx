@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, Heart, Loader, LogIn, Plus, UserPlus } from 'lucide-react'
+import { Check, Heart, LogIn, Plus, UserPlus } from 'lucide-react'
+import { Skeleton, TrackSkeletonList } from './Skeleton'
 import { useAccount } from '../features/account/AccountContext'
 import { rubberBandAtBounds } from '../utils/motion'
 
@@ -147,7 +148,7 @@ export default function AddToPlaylist({ track, hideButton = false, open: openPro
       aria-label="Save to playlist"
     >
       <div className="popover-head">
-        <img src={track.thumbnail || `https://i.ytimg.com/vi/${track.id}/mqdefault.jpg`} alt="" />
+        <img src={track.thumbnail || `https://i.ytimg.com/vi/${track.id}/mqdefault.jpg`} alt="" loading="lazy" decoding="async" />
         <div><small>Save to playlist</small><strong title={track.title}>{track.title}</strong></div>
       </div>
 
@@ -159,7 +160,7 @@ export default function AddToPlaylist({ track, hideButton = false, open: openPro
         {playlistsError
           ? <p className="popover-state" role="alert">{playlistsError}</p>
           : !playlistsReady
-            ? <p className="popover-state"><Loader size={15} className="spin" /> Loading your playlists…</p>
+            ? <TrackSkeletonList count={3} className="skeleton-popover-list" />
             : own.length === 0
               ? <p className="popover-state">You have no playlists yet. Name one below to save this song.</p>
               : <div className="popover-list" role="group" aria-label="Your playlists" onWheel={(event) => rubberBandAtBounds(event.currentTarget, event.deltaY)}>
@@ -189,7 +190,7 @@ export default function AddToPlaylist({ track, hideButton = false, open: openPro
             data-autofocus={emptyLibrary ? '' : undefined}
           />
           <button className="btn btn-small btn-primary" type="submit" disabled={!name.trim() || creating}>
-            {creating ? <Loader size={14} className="spin" /> : <Plus size={14} />} Create
+            {creating ? <Skeleton className="skeleton-button" /> : <Plus size={14} />} {creating ? 'Creating…' : 'Create'}
           </button>
         </form>}
       </>}
@@ -245,8 +246,8 @@ function getPosition(button) {
 
 function friendlyError(error) {
   const code = error?.code || ''
-  if (code === 'permission-denied') return 'The database refused this. Check your Firestore rules for users/{uid}/playlists.'
-  if (code === 'unavailable') return 'You seem to be offline. It will save when you reconnect.'
-  if (code === 'unauthenticated' || /not logged in/i.test(error?.message || '')) return 'Please log in again to save songs.'
-  return error?.message || 'Could not save this song. Try again.'
+  if (code === 'permission-denied') return 'Melojam couldn’t save this song. Try again in a moment.'
+  if (code === 'unavailable') return 'Melojam couldn’t reach the server. Check your connection and try again.'
+  if (code === 'unauthenticated' || /not logged in/i.test(error?.message || '')) return 'Your session may have expired. Log in again to save songs.'
+  return 'Melojam couldn’t save this song. Try again.'
 }
