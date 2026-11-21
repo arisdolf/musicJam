@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 
 import {
   createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider,
-  onAuthStateChanged, signOut, updateProfile, EmailAuthProvider, reauthenticateWithCredential,
+  browserLocalPersistence, onAuthStateChanged, setPersistence, signOut, updateProfile, EmailAuthProvider, reauthenticateWithCredential,
   updatePassword, deleteUser,
 } from 'firebase/auth'
 import { ref, onValue, push, set, remove, get, update } from 'firebase/database'
@@ -70,7 +70,21 @@ export function AccountProvider({ children }) {
   const playlistsRef = useRef([])
   const userId = user?.id
 
-  useEffect(() => onAuthStateChanged(auth, (u) => { setUser(toUser(u)); setLoadingAccount(false) }), [])
+  useEffect(() => {
+    let active = true
+    let unsubscribe
+    const restoreAuth = async () => {
+      try { await setPersistence(auth, browserLocalPersistence) }
+      catch (error) { console.warn('Could not enable persistent sign-in:', error) }
+      if (!active) return
+      unsubscribe = onAuthStateChanged(auth, (u) => {
+        setUser(toUser(u))
+        setLoadingAccount(false)
+      }, () => setLoadingAccount(false))
+    }
+    restoreAuth()
+    return () => { active = false; unsubscribe?.() }
+  }, [])
 
   // Live playlists: any change (even from another device) shows up instantly.
   useEffect(() => {
@@ -187,6 +201,17 @@ const toggleLike = useCallback(async (track) => {
     await remove(ref(db, `playlists/${uid()}/${playlistId}/tracks/${trackId}`))
   }, [])
 
+  const reorderPlaylistTracks = useCallback(async (playlistId, trackIds) => {
+    const playlist = playlistsRef.current.find((item) => item.id === playlistId)
+    if (!playlist) throw new Error('Playlist not found.')
+    const currentIds = playlist.tracks.map((track) => track.id)
+    if (trackIds.length !== currentIds.length || currentIds.some((id) => !trackIds.includes(id))) {
+      throw new Error('This playlist changed. Refresh it and try again.')
+    }
+    const positions = Object.fromEntries(trackIds.map((trackId, position) => [`${trackId}/position`, position]))
+    await update(ref(db, `playlists/${uid()}/${playlistId}/tracks`), positions)
+  }, [])
+
   const renamePlaylist = useCallback(async (playlistId, name) => {
   if (playlistId === LIKED_ID) throw new Error('Liked songs can’t be renamed.')
     const clean = name.trim().slice(0, 60)
@@ -204,11 +229,11 @@ const toggleLike = useCallback(async (track) => {
     openAuth: setAuthMode, closeAuth: () => setAuthMode(null),
     signUp, logIn, logInWithGoogle, logOut, updateName, changePassword, deleteAccount,
     likedIds, toggleLike,
-    createPlaylist, renamePlaylist, addToPlaylist, removeFromPlaylist, deletePlaylist,
+    createPlaylist, renamePlaylist, addToPlaylist, removeFromPlaylist, reorderPlaylistTracks, deletePlaylist,
   }), [user, playlists, playlistsReady, playlistsError, authMode, loadingAccount,
     likedIds, toggleLike,
        signUp, logIn, logInWithGoogle, logOut, updateName, changePassword, deleteAccount,
-       createPlaylist, renamePlaylist, addToPlaylist, removeFromPlaylist, deletePlaylist])
+       createPlaylist, renamePlaylist, addToPlaylist, removeFromPlaylist, reorderPlaylistTracks, deletePlaylist])
 
   return <AccountContext.Provider value={value}>{children}</AccountContext.Provider>
 }

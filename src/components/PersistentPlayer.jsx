@@ -92,6 +92,8 @@ const moreRef = useRef(null)
   const [playerReady, setPlayerReady] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [view, setView] = useState('player')        // 'player' | 'queue' | 'search'
+  const [closing, setClosing] = useState(false)
+  const [searchExiting, setSearchExiting] = useState(false)
   const [lyricsFull, setLyricsFull] = useState(false)
   const [showLyrics, setShowLyrics] = useState(readShowLyrics)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -105,6 +107,7 @@ const moreRef = useRef(null)
   const [sleepLeft, setSleepLeft] = useState(0)     // seconds remaining
   const [queueExiting, setQueueExiting] = useState(false)
   const playerHostRef = useRef(null)
+  const silentAudioRef = useRef(null)
   const [clearOpen, setClearOpen] = useState(false)
   const playerRef = useRef(null)
   const requestedVideoRef = useRef(null)
@@ -112,6 +115,9 @@ const moreRef = useRef(null)
   const lyricLineRefs = useRef([])
   const lyricsListRef = useRef(null)
   const queueTimerRef = useRef(0)
+  const closeTimerRef = useRef(0)
+  const searchTimerRef = useRef(0)
+  const closingRef = useRef(false)
   const stageRef = useRef(null)
   const overlayRef = useRef(null)
   const cardRef = useRef(null)
@@ -147,9 +153,34 @@ const moreRef = useRef(null)
   const lyricOffset = currentTrackId ? (offsets[currentTrackId] ?? readOffset(currentTrackId)) : 0
   const currentLyricText = showLyrics && activeLyricIndex >= 0 ? lyricLines[activeLyricIndex]?.text : ''
 
+  const finishCollapse = useCallback(() => {
+    clearTimeout(closeTimerRef.current)
+    closingRef.current = false
+    setClosing(false)
+    setExpanded(false)
+    setMenuOpen(false)
+    setView('player')
+    setQueueExiting(false)
+    setPlaylistOpen(false)
+  }, [])
+
   const collapse = useCallback(() => {
-  setExpanded(false); setMenuOpen(false); setView('player'); setQueueExiting(false); setPlaylistOpen(false)
-}, [])
+    if (closingRef.current) return
+    closingRef.current = true
+    setClosing(true)
+    setMenuOpen(false)
+    setPlaylistOpen(false)
+    closeTimerRef.current = setTimeout(finishCollapse, 220)
+  }, [finishCollapse])
+
+  const closeSearch = useCallback(() => {
+    setSearchExiting(true)
+    clearTimeout(searchTimerRef.current)
+    searchTimerRef.current = setTimeout(() => {
+      setView('player')
+      setSearchExiting(false)
+    }, 180)
+  }, [])
 
   const toggleLyrics = () => {
     const next = !showLyrics
@@ -288,7 +319,7 @@ const moreRef = useRef(null)
         card.style.opacity = '0'
         overlay.style.transition = 'background-color 180ms var(--ease-out)'
         overlay.style.backgroundColor = 'rgba(4,8,10,0)'
-        setTimeout(() => { reset(); collapse() }, 185)
+        setTimeout(() => { reset(); finishCollapse() }, 185)
       } else {
         card.style.transition = 'transform 240ms var(--ease-out), opacity 240ms var(--ease-out)'
         card.style.transform = ''
@@ -570,7 +601,45 @@ const moreRef = useRef(null)
     return () => clearTimeout(timer)
   }, [modeToast])
 
-  useEffect(() => () => { clearTimeout(queueTimerRef.current); clearTimeout(ytStateTimer.current) }, [])
+  useEffect(() => () => {
+    clearTimeout(queueTimerRef.current)
+    clearTimeout(closeTimerRef.current)
+    clearTimeout(searchTimerRef.current)
+    clearTimeout(ytStateTimer.current)
+  }, [])
+
+  // Keep a real media element active while YouTube plays in its off-screen iframe. Android may
+  // otherwise discard the page's Media Session after the screen has been locked for a while.
+  useEffect(() => {
+    const audio = new Audio(makeSilentWav(6))
+    audio.loop = true
+    audio.preload = 'auto'
+    silentAudioRef.current = audio
+    return () => {
+      audio.pause()
+      URL.revokeObjectURL(audio.src)
+      silentAudioRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    const audio = silentAudioRef.current
+    if (!audio) return
+    if (showPause) audio.play().catch(() => { /* Media playback may be blocked until a user gesture. */ })
+    else audio.pause()
+  }, [showPause])
+
+  // A silent element is not automatically paused by every platform when another app takes audio
+  // focus, so explicitly stop the YouTube player and our background session on interruption.
+  useEffect(() => {
+    const session = navigator.audioSession
+    if (!session?.addEventListener) return undefined
+    const onStateChange = () => {
+      if (session.state === 'interrupted' && callbacksRef.current.playback.playing) changePlaying(false)
+    }
+    session.addEventListener('statechange', onStateChange)
+    return () => session.removeEventListener('statechange', onStateChange)
+  }, [changePlaying])
 
   // ── YouTube player (kept alive but hidden: audio only) ─────────────────────
   useEffect(() => {
@@ -830,7 +899,7 @@ const moreRef = useRef(null)
       navigator.mediaSession.metadata = new window.MediaMetadata({
         title: currentTrackTitle,
         artist: currentTrackArtist,
-        album: 'Jamroom', // shown under the artist on some phones
+        album: 'Melojam', // shown under the artist on some phones
         artwork: [
           { src: `https://i.ytimg.com/vi/${currentTrackId}/mqdefault.jpg`, sizes: '320x180', type: 'image/jpeg' },
           { src: `https://i.ytimg.com/vi/${currentTrackId}/hqdefault.jpg`, sizes: '480x360', type: 'image/jpeg' },
@@ -906,15 +975,15 @@ const moreRef = useRef(null)
       <button className="icon-btn" onClick={() => playIndex(nextIndex())} disabled={!canNext} aria-label="Next song"><SkipForward size={17} /></button>
     </div>}
 
-    {fullOpen && <div ref={overlayRef} className="np-overlay" role="dialog" aria-modal="true" aria-label="Now playing"
+    {fullOpen && <div ref={overlayRef} className={`np-overlay${closing ? ' is-closing' : ''}`} role="dialog" aria-modal="true" aria-label="Now playing"
       onMouseDown={(event) => { if (event.target === event.currentTarget) collapse() }}>
-      <section ref={cardRef} className="np-card">
+      <section ref={cardRef} className={`np-card${closing ? ' is-closing' : ''}`}>
         <div className="np-backdrop" style={{ backgroundImage: `url("${art}")` }} aria-hidden="true" />
 
         <header className="np-top" onPointerDown={startDismissSwipe}>
           <button
             className="np-icon"
-            onClick={view === 'player' ? collapse : view === 'queue' ? closeQueue : () => setView('player')}
+            onClick={view === 'player' ? collapse : view === 'queue' ? closeQueue : closeSearch}
             aria-label={view === 'player' ? 'Close player' : 'Back to player'}
           >
             {view === 'player' ? <ChevronDown size={22} /> : <ArrowLeft size={20} />}
@@ -936,6 +1005,7 @@ const moreRef = useRef(null)
             onPlay={onPlayTrack}
             onQueue={onQueueTrack}
             onPlayNext={onPlayNext}
+            exiting={searchExiting}
           />
           : view === 'queue'
             ? <ul ref={queueDrag.listRef} className={`np-queue-list ${queueExiting ? 'np-panel-out' : 'np-panel-in'}`} onWheel={(event) => rubberBandAtBounds(event.currentTarget, event.deltaY)}>
@@ -1055,7 +1125,7 @@ const moreRef = useRef(null)
               : <>
                 <button role="menuitem" onClick={() => { setView('search'); setMenuOpen(false) }}><Search size={16} /> Add music</button>
                 <button role="menuitem" onClick={() => { setMenuOpen(false); setPlaylistOpen(true) }}><ListPlus size={16} /> Add to playlist</button>
-                {playbackQueue.length > 0 && <button role="menuitem" onClick={() => { setMenuOpen(false); setClearOpen(true) }}><Trash2 size={16} /> Remove all tracks</button>}
+                {view === 'queue' && playbackQueue.length > 0 && <button role="menuitem" onClick={() => { setMenuOpen(false); setClearOpen(true) }}><Trash2 size={16} /> Remove all tracks</button>}
                 <button role="menuitem" onClick={() => setMenuPage('timer')}>
                   <Timer size={16} /> Sleep timer {sleepEnd && <small>{sleepLabel}</small>}
                 </button>
@@ -1151,7 +1221,7 @@ function findLyricIndex(lines, currentTime) {
   return result
 }
 
-function SongSearch({ queuedIds, onPlay, onQueue, onPlayNext }) {
+function SongSearch({ queuedIds, onPlay, onQueue, onPlayNext, exiting = false }) {
   const [query, setQuery] = useState('')
   const inputRef = useRef(null)
   const [state, setState] = useState({ query: '', results: [], searching: false, error: '' })
@@ -1180,7 +1250,7 @@ function SongSearch({ queuedIds, onPlay, onQueue, onPlayNext }) {
     return () => { clearTimeout(timer); controller.abort() }
   }, [q])
 
-  return <div className="np-search">
+  return <div className={`np-search${exiting ? ' is-exiting' : ''}`}>
     <div className="np-search-input">
       <input
         ref={inputRef}
@@ -1197,6 +1267,7 @@ function SongSearch({ queuedIds, onPlay, onQueue, onPlayNext }) {
       {searching && Array.from({ length: 3 }, (_, index) => <li className="np-search-loading" key={`search-skeleton-${index}`} aria-hidden="true">
         <Skeleton className="np-search-cover" />
         <span className="np-search-copy"><Skeleton /><Skeleton /></span>
+        <span className="np-search-actions"><Skeleton className="np-search-action" /><Skeleton className="np-search-action" /></span>
       </li>)}
       {!searching && error && <li className="np-search-note">{error}</li>}
       {!searching && results.map((track) => {

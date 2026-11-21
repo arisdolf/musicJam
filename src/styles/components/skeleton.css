@@ -89,12 +89,14 @@
 .room-status-skeleton { width: 48%; height: 20px; margin-bottom: 14px; border-radius: 99px; }
 .room-section-heading-skeleton { width: 120px; height: 14px; margin: 24px 0 10px; border-radius: 6px; }
 .room-submit-skeleton { width: 100%; height: 44px; border-radius: 10px; }
-.np-search-loading { min-height: 58px; display: flex; align-items: center; gap: 10px; padding: 8px; }
+.np-search-loading { min-height: 46px; display: flex; align-items: center; gap: 4px; padding: 4px; }
 .np-search-loading .skeleton { background: linear-gradient(100deg, rgba(255,255,255,.045) 20%, rgba(255,255,255,.095) 38%, rgba(255,255,255,.045) 56%); background-size: 220% 100%; }
-.np-search-cover { width: 44px; height: 38px; flex: 0 0 auto; border-radius: 6px; }
-.np-search-copy { flex: 1; display: grid; justify-items: start; gap: 7px; }
+.np-search-cover { width: 54px; height: 38px; flex: 0 0 auto; border-radius: 6px; }
+.np-search-copy { flex: 1; min-width: 0; display: grid; justify-items: start; gap: 7px; margin-left: 6px; }
 .np-search-copy .skeleton:first-child { width: 64%; height: 10px; border-radius: 6px; }
 .np-search-copy .skeleton:last-child { width: 38%; height: 8px; border-radius: 6px; opacity: .68; }
+.np-search-actions { display: flex; align-items: center; gap: 4px; }
+.np-search-action { width: 34px; height: 34px; flex: 0 0 auto; border-radius: 50%; opacity: .58; }
 
 @media (max-width: 480px) {
   .skeleton-cover { width: 44px; height: 32px; }

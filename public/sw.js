@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'melojam-shell-v1'
+const SHELL_CACHE = 'melojam-shell-v2'
 const SHELL_FILES = [
   '/',
   '/manifest.webmanifest',
@@ -56,6 +56,25 @@ self.addEventListener('fetch', (event) => {
   const { request } = event
   const url = new URL(request.url)
   if (request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return
+
+  // Vite's dev modules are transient. Caching them can mix React and React DOM from different
+  // optimizer generations, which breaks the shared Hooks dispatcher. Refresh them online, but
+  // keep the last working copy available as the offline fallback.
+  if (url.pathname.startsWith('/src/') || url.pathname.startsWith('/node_modules/.vite/') ||
+      url.pathname.startsWith('/@vite/') || url.pathname.startsWith('/@id/') ||
+      url.pathname.startsWith('/@fs/') || url.pathname.startsWith('/@react-refresh')) {
+    event.respondWith((async () => {
+      const cache = await caches.open(SHELL_CACHE)
+      try {
+        const response = await fetch(request)
+        if (response.ok && response.type === 'basic') await cache.put(request, response.clone())
+        return response
+      } catch {
+        return (await cache.match(request)) || Response.error()
+      }
+    })())
+    return
+  }
 
   if (request.mode === 'navigate') {
     event.respondWith((async () => {

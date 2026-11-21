@@ -26,7 +26,7 @@ const Settings = lazy(() => import('./pages/Settings'))
 
 // ── Inner shell (needs AccountContext) ────────────────────────────────────────
 function Shell() {
-  const { user } = useAccount()
+  const { user, loadingAccount } = useAccount()
   const {
     state: localPlaybackState,
     updatePlayback: updateLocalPlayback,
@@ -200,6 +200,10 @@ const renderContent = () => {
     default: return <Home onPlaySong={playWithSimilar} onQueueTrack={queueTrack} onPlayTracks={playTracks} />
   }
 }
+
+  if (loadingAccount) {
+    return <div className="app-shell"><main className="app-content"><PageSkeleton view={view} roomCode={roomCode} settingsSection={settingsSection} /></main></div>
+  }
 
   return (
     <div className={`app-shell${playbackState.queue.length ? ' has-player' : ''}`}>

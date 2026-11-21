@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { useAccount } from '../features/account/AccountContext'
-import { ArrowLeft, Heart, Check, Disc3, ListMusic, Music2, Pencil, Play, Plus, Search, Trash2, X, ListPlus, Upload } from 'lucide-react'
+import { ArrowLeft, Heart, Check, Disc3, GripVertical, ListMusic, Music2, Pencil, Play, Plus, Search, Trash2, X, ListPlus, Upload } from 'lucide-react'
 import { Skeleton } from '../components/Skeleton'
 import FeedbackModal from '../components/FeedbackModal'
 import ConfirmModal from '../components/ConfirmModal'
@@ -8,12 +8,13 @@ import { layoutTransitionName, withViewTransition } from '../utils/viewTransitio
 import { parseExportifyCsv } from '../services/importCsv'
 import { matchSong } from '../services/youtube'
 import { useTopbar } from '../components/TopBarContext'
+import { useDragReorder } from '../hooks/useDragReorder'
 
 
 export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
   const IMPORT_LIMIT = 100 // each song costs ~101 YouTube quota units; the free daily quota is 10,000
   const QUOTA_REASONS = ['quotaExceeded', 'dailyLimitExceeded', 'RESOURCE_EXHAUSTED']
-  const { user, openAuth, playlists, createPlaylist, renamePlaylist, removeFromPlaylist, deletePlaylist } = useAccount()
+  const { user, openAuth, playlists, createPlaylist, renamePlaylist, removeFromPlaylist, reorderPlaylistTracks, deletePlaylist } = useAccount()
   const [name, setName] = useState('')
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState(null)
@@ -27,6 +28,16 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
   const importAbort = useRef(null)
   const fileInput = useRef(null)
   const selected = playlists.find((playlist) => playlist.id === selectedId)
+  const movePlaylistTrack = async (from, to) => {
+    if (!selected || to < 0 || to >= selected.tracks.length || from === to) return
+    const tracks = [...selected.tracks]
+    const [moved] = tracks.splice(from, 1)
+    tracks.splice(to, 0, moved)
+    setError('')
+    try { await reorderPlaylistTracks(selected.id, tracks.map((track) => track.id)) }
+    catch (err) { setError(err.message || 'Could not reorder this playlist.') }
+  }
+  const { listRef: trackListRef, dragIndex, itemStyle, handleProps } = useDragReorder(movePlaylistTrack)
   const visiblePlaylists = useMemo(() => {
     const query = search.trim().toLowerCase()
     return query ? playlists.filter((playlist) => playlist.name.toLowerCase().includes(query)) : playlists
@@ -39,7 +50,10 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
         <Disc3 size={34} />
         <h2>Make your own music library</h2>
         <p className="muted">Sign in to create playlists and save tracks from Home and your rooms.</p>
-        <button className="btn btn-primary" onClick={() => openAuth('signup')}><Music2 size={16} /> Sign up or log in</button>
+        <div className="playlist-guest-actions">
+          <button className="btn" onClick={onBrowse}><Search size={16} /> Find songs</button>
+          <button className="btn btn-primary" onClick={() => openAuth('signup')}><Music2 size={16} /> Sign up or log in</button>
+        </div>
       </section>
     </main>
   }
@@ -201,11 +215,17 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
         </div>
       </section>
       <section className="playlist-tracks-section">
-        <div className="block-head"><h2><ListMusic size={17} /> Songs</h2><span className="muted">{selected.tracks.length}</span></div>
+        <div className="block-head"><div><h2><ListMusic size={17} /> Songs</h2><p className="muted playlist-reorder-hint">Drag a song by the grip to change its play order.</p></div><span className="muted">{selected.tracks.length}</span></div>
         {selected.tracks.length === 0
           ? <div className="playlist-empty-state compact"><Music2 size={28} /><h2>This playlist is empty</h2><p className="muted">Find a song you like and save it here.</p><button className="btn btn-primary btn-small" onClick={onBrowse}><Search size={15} /> Find songs</button></div>
-          : <ul className="track-list playlist-track-list">
-            {selected.tracks.map((track, index) => <li className="track playlist-track" key={`${track.id}-${index}`}>
+          : <ul ref={trackListRef} className="track-list playlist-track-list">
+            {selected.tracks.map((track, index) => <li className={`track playlist-track${dragIndex === index ? ' is-dragging' : ''}`} key={track.id} style={itemStyle(index)}>
+              <button type="button" className="playlist-track-grip" {...handleProps(index)} onKeyDown={(event) => {
+                if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+                  event.preventDefault()
+                  movePlaylistTrack(index, index + (event.key === 'ArrowUp' ? -1 : 1))
+                }
+              }} aria-label={`Reorder ${track.title}`} title="Drag to reorder"><GripVertical size={18} /></button>
               <button className={`track-play ${track.id === currentTrackId ? 'is-selected' : ''}`} onClick={() => playAt(index)} aria-label={`Play ${track.title}`} title="Play this song"><Play size={15} fill="currentColor" /></button>
               <img src={track.thumbnail} alt="" loading="lazy" />
               <div className="track-text"><strong title={track.title}>{track.title}</strong><small>{track.artist}</small></div>
