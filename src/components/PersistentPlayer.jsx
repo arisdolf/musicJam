@@ -126,6 +126,7 @@ const moreRef = useRef(null)
   const showPause = playerReady && playbackPlaying && (ytState === 1 || ytState === 3)
   const currentTrack = playbackQueue[playbackCurrent] || null
   const currentTrackId = currentTrack?.id
+  const hasCurrentTrack = Boolean(currentTrackId)
   const currentTrackLyricsId = currentTrack?.lyricsId
   const currentTrackTitle = currentTrack?.title
   const currentTrackArtist = currentTrack?.artist
@@ -441,6 +442,28 @@ const moreRef = useRef(null)
     if (playing) requestVideo(track)
     else playerRef.current?.pauseVideo?.()
   }, [onPlaybackChange, playbackCurrent, playbackQueue, requestVideo, livePosition])
+
+  const mediaActionsRef = useRef(null)
+  mediaActionsRef.current = {
+    play: () => changePlaying(true),
+    pause: () => changePlaying(false),
+    previoustrack: () => playIndex(playbackCurrent - 1),
+    nexttrack: () => playIndex(nextIndex()),
+    seekbackward: () => {
+      const time = Math.max(0, Number(playerRef.current?.getCurrentTime?.() || 0) - 10)
+      try { playerRef.current?.seekTo?.(time, true) } catch { /* player not ready */ }
+      seekRoom(time)
+    },
+    seekforward: () => {
+      const time = Math.max(0, Number(playerRef.current?.getCurrentTime?.() || 0) + 10)
+      try { playerRef.current?.seekTo?.(time, true) } catch { /* player not ready */ }
+      seekRoom(time)
+    },
+    seekto: (details) => {
+      try { playerRef.current?.seekTo?.(details.seekTime, true) } catch { /* player not ready */ }
+      seekRoom(details.seekTime)
+    },
+  }
 
   const resumeRef = useRef(undefined) // where the last session stopped; used once, on the first load
   if (resumeRef.current === undefined) resumeRef.current = readResume()
@@ -814,33 +837,24 @@ const moreRef = useRef(null)
         ],
       })
     }
-    const jump = (seconds) => {
-      const player = playerRef.current
-      const time = Math.max(0, Number(player?.getCurrentTime?.() || 0) + seconds)
-      try { player?.seekTo?.(time, true) } catch { /* player not ready */ }
-      seekRoom(time)
-    }
-    const actions = {
-      play: () => changePlaying(true),
-      pause: () => changePlaying(false),
-      previoustrack: () => playIndex(playbackCurrent - 1),
-      nexttrack: () => playIndex(nextIndex()),
-      seekbackward: () => jump(-10),
-      seekforward: () => jump(10),
-      seekto: (details) => {
-        try { playerRef.current?.seekTo?.(details.seekTime, true) } catch { /* player not ready */ }
-        seekRoom(details.seekTime)
-      },
-    }
-    for (const [action, handler] of Object.entries(actions)) {
-      try { navigator.mediaSession.setActionHandler(action, handler) } catch { /* unsupported action */ }
+  }, [currentTrackId, currentTrackTitle, currentTrackArtist])
+
+  // Install transport controls once per active playback session. Re-registering them on every
+  // queue update can make browsers drop the skip buttons from their system media notification.
+  useEffect(() => {
+    if (!hasCurrentTrack || !('mediaSession' in navigator)) return undefined
+    const actions = Object.keys(mediaActionsRef.current)
+    for (const action of actions) {
+      try {
+        navigator.mediaSession.setActionHandler(action, (...args) => mediaActionsRef.current[action](...args))
+      } catch { /* unsupported action */ }
     }
     return () => {
-      for (const action of Object.keys(actions)) {
+      for (const action of actions) {
         try { navigator.mediaSession.setActionHandler(action, null) } catch { /* noop */ }
       }
     }
-  }, [currentTrackId, currentTrackTitle, currentTrackArtist, playbackCurrent, changePlaying, playIndex, nextIndex, seekRoom])
+  }, [hasCurrentTrack])
 
 
   // Keeps the lock-screen progress bar in step with the song.
