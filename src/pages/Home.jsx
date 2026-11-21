@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Check, Flame, Play, Plus, RotateCw, Trash2} from 'lucide-react'
 import LikeButton from '../components/LikeButton'
-import { TrackSkeletonList } from '../components/Skeleton'
+import { HomeTrackSkeletonList } from '../components/Skeleton'
 import { getTrending } from '../services/youtube'
 import TrackMenu from '../components/TrackMenu'
 export default function Home({ onPlaySong, onQueueTrack, onPlayTracks }) {
@@ -41,7 +41,7 @@ export default function Home({ onPlaySong, onQueueTrack, onPlayTracks }) {
       </button>}
     </div>
 
-    {loading && <TrackSkeletonList count={5} />}
+    {loading && <HomeTrackSkeletonList count={5} />}
     {!loading && error && <div className="empty-result-card">
       <span>{error}</span>
       <button className="btn btn-small" onClick={retry}><RotateCw size={14} /> Try again</button>

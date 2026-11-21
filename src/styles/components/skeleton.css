@@ -17,6 +17,8 @@
 .skeleton-title { width: min(68%, 220px); height: 11px; border-radius: 6px; }
 .skeleton-subtitle { width: min(42%, 140px); height: 8px; border-radius: 5px; opacity: .72; }
 .skeleton-action { width: 28px; height: 28px; flex: 0 0 auto; border-radius: 50%; opacity: .8; }
+.skeleton-actions { display: flex; align-items: center; gap: 3px; }
+.skeleton-track-list.actions-4 .skeleton-action { width: 22px; height: 22px; }
 
 .page-skeleton { min-height: 320px; }
 .page-skeleton-title { width: min(52%, 220px); height: 28px; margin: 2px 0 12px; border-radius: 8px; }
@@ -27,10 +29,10 @@
 .search-skeleton .skeleton-track { min-height: 52px; }
 .search-skeleton .skeleton-cover { width: 44px; height: 32px; }
 .search-skeleton .skeleton-action { width: 24px; height: 24px; }
-.skeleton-popover-list { padding: 4px 0; }
-.skeleton-popover-list .skeleton-track { min-height: 45px; padding: 6px 10px; }
-.skeleton-popover-list .skeleton-cover { display: none; }
-.skeleton-popover-list .skeleton-action { width: 20px; height: 20px; }
+.skeleton-popover-list .playlist-row-skeleton { min-height: 45px; padding: 6px 8px; }
+.skeleton-popover-list .playlist-skeleton-name { width: min(54%, 150px); }
+.skeleton-popover-list .playlist-skeleton-count { width: 44%; }
+.skeleton-popover-list .playlist-skeleton-check { width: 20px; height: 20px; }
 
 .lyrics-skeleton { width: min(100%, 300px); display: grid; justify-items: center; gap: 12px; padding: 14px 8px; margin: auto; }
 .lyrics-line { width: 74%; height: 9px; border-radius: 99px; opacity: .58; }
@@ -41,6 +43,52 @@
 .skeleton-import-icon { width: 22px; height: 22px; border-radius: 7px; }
 .friend-skeleton-avatar { width: 30px; height: 30px; flex: 0 0 auto; border-radius: 50%; }
 .friend-skeleton-name { width: min(48%, 180px); height: 11px; border-radius: 6px; }
+.home-track-skeleton-list { display: grid; }
+.home-track-skeleton { min-height: 56px; display: flex; align-items: center; gap: 10px; padding: 8px; border-bottom: 1px solid var(--line); }
+.home-skeleton-rank { width: 18px; height: 11px; flex: 0 0 auto; border-radius: 5px; opacity: .55; }
+.home-skeleton-actions { display: flex; align-items: center; gap: 4px; }
+.home-skeleton-actions .skeleton { width: 28px; height: 28px; border-radius: 50%; }
+.playlist-list-skeleton { display: grid; }
+.playlist-row-skeleton { min-height: 50px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.playlist-row-skeleton:last-child { border-bottom: 0; }
+.playlist-row-skeleton > span { flex: 1; display: grid; justify-items: start; gap: 6px; }
+.playlist-skeleton-name { width: min(54%, 190px); height: 10px; border-radius: 6px; }
+.playlist-skeleton-count { width: 24%; height: 8px; border-radius: 5px; opacity: .65; }
+.playlist-skeleton-check { width: 22px; height: 22px; border-radius: 7px; }
+.playlist-cards-skeleton { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; margin-top: 24px; }
+.playlist-card-skeleton { display: grid; grid-template-columns: 52px 1fr; grid-template-rows: 1fr 1fr; column-gap: 12px; align-items: center; padding: 14px; border: 1px solid var(--line); border-radius: 16px; }
+.playlist-card-cover-skeleton { width: 52px; height: 52px; grid-row: span 2; border-radius: 12px; }
+.playlist-card-title-skeleton { width: 76%; height: 11px; border-radius: 6px; }
+.playlist-card-count-skeleton { width: 48%; height: 8px; border-radius: 5px; opacity: .65; }
+.skeleton-page-actions { display: flex; gap: 8px; margin-top: 18px; }
+.skeleton-page-actions .skeleton { width: 104px; height: 36px; border-radius: 9px; }
+.recent-skeleton-list { margin: 20px 0; }
+.recent-row-skeleton { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); }
+.recent-row-skeleton > span { display: grid; gap: 6px; }
+.recent-code-skeleton { width: 90px; height: 13px; border-radius: 5px; }
+.recent-time-skeleton { width: 62px; height: 8px; border-radius: 5px; opacity: .65; }
+.recent-button-skeleton { width: 72px; height: 32px; border-radius: 8px; }
+.settings-card-skeleton, .quota-card-skeleton { margin-top: 14px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; }
+.settings-card-heading-skeleton { width: 42%; height: 12px; margin-bottom: 14px; border-radius: 6px; }
+.settings-card-copy-skeleton { width: 70%; height: 9px; margin-bottom: 18px; border-radius: 5px; opacity: .7; }
+.settings-card-row-skeleton { width: 100%; height: 36px; border-radius: 8px; }
+.friends-search-skeleton, .room-search-skeleton { width: 100%; height: 42px; margin: 16px 0; border: 1px solid var(--line); border-radius: 999px; }
+.friend-rows-skeleton { display: grid; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.friend-row-skeleton { min-height: 54px; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.friend-row-skeleton:last-child { border-bottom: 0; }
+.friend-skeleton-action { width: 66px; height: 30px; margin-left: auto; border-radius: 8px; }
+.quota-summary-skeleton { width: 100%; height: 42px; margin: 14px 0; border-bottom: 1px solid var(--line); }
+.quota-cards-skeleton { display: grid; gap: 10px; }
+.quota-card-skeleton { display: grid; grid-template-columns: 1fr auto; gap: 14px; }
+.quota-card-title-skeleton { width: 110px; height: 11px; border-radius: 5px; }
+.quota-card-badge-skeleton { width: 76px; height: 21px; border-radius: 99px; }
+.quota-card-bar-skeleton { grid-column: 1 / -1; width: 100%; height: 8px; border-radius: 99px; }
+.quota-card-meta-skeleton { grid-column: 1 / -1; width: 74%; height: 8px; border-radius: 5px; opacity: .65; }
+.room-actions-skeleton { display: flex; justify-content: space-between; margin: 6px 0 14px; }
+.room-actions-skeleton .skeleton { width: 82px; height: 34px; border-radius: 8px; }
+.room-status-skeleton { width: 48%; height: 20px; margin-bottom: 14px; border-radius: 99px; }
+.room-section-heading-skeleton { width: 120px; height: 14px; margin: 24px 0 10px; border-radius: 6px; }
+.room-submit-skeleton { width: 100%; height: 44px; border-radius: 10px; }
 .np-search-loading { min-height: 58px; display: flex; align-items: center; gap: 10px; padding: 8px; }
 .np-search-loading .skeleton { background: linear-gradient(100deg, rgba(255,255,255,.045) 20%, rgba(255,255,255,.095) 38%, rgba(255,255,255,.045) 56%); background-size: 220% 100%; }
 .np-search-cover { width: 44px; height: 38px; flex: 0 0 auto; border-radius: 6px; }
@@ -51,4 +99,6 @@
 @media (max-width: 480px) {
   .skeleton-cover { width: 44px; height: 32px; }
   .page-skeleton-title { height: 24px; }
+  .home-skeleton-actions .skeleton { width: 24px; height: 24px; }
+  .playlist-cards-skeleton { grid-template-columns: 1fr; }
 }

@@ -113,6 +113,8 @@ const moreRef = useRef(null)
   const lyricsListRef = useRef(null)
   const queueTimerRef = useRef(0)
   const stageRef = useRef(null)
+  const overlayRef = useRef(null)
+  const cardRef = useRef(null)
   const changePlayingRef = useRef(null)
   const [slideDir, setSlideDir] = useState(null) // which side the next page slides in from
   const callbacksRef = useRef({ playback, onPlaybackChange, sync, mode })
@@ -238,6 +240,67 @@ const moreRef = useRef(null)
         setTimeout(clear, 330)
       }
     }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', end)
+    window.addEventListener('pointercancel', end)
+  }
+
+  const startDismissSwipe = (event) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    if (event.target.closest?.('button, input, a, [role="button"], .np-lyrics-list, .np-search, .np-queue-list, .np-drag-handle')) return
+    const card = cardRef.current
+    const overlay = overlayRef.current
+    if (!card || !overlay) return
+    const startX = event.clientX
+    const startY = event.clientY
+    let dragging = false
+    let dy = 0
+
+    const move = (moveEvent) => {
+      const dx = moveEvent.clientX - startX
+      dy = moveEvent.clientY - startY
+      if (!dragging) {
+        if (dy < 8 || dy < Math.abs(dx)) return
+        dragging = true
+      }
+      const pull = Math.max(0, dy)
+      card.style.transition = 'none'
+      card.style.transform = `translateY(${pull}px)`
+      card.style.opacity = String(1 - Math.min(pull / 480, 0.55))
+      overlay.style.backgroundColor = `rgba(4,8,10,${Math.max(0.12, 0.6 - pull / 520)})`
+    }
+
+    const end = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', end)
+      window.removeEventListener('pointercancel', end)
+      if (!dragging) return
+      const reset = () => {
+        card.style.transition = ''
+        card.style.transform = ''
+        card.style.opacity = ''
+        overlay.style.backgroundColor = ''
+      }
+      if (dy > 88) {
+        card.style.transition = 'transform 180ms var(--ease-out), opacity 180ms var(--ease-out)'
+        card.style.transform = 'translateY(100%)'
+        card.style.opacity = '0'
+        overlay.style.transition = 'background-color 180ms var(--ease-out)'
+        overlay.style.backgroundColor = 'rgba(4,8,10,0)'
+        setTimeout(() => { reset(); collapse() }, 185)
+      } else {
+        card.style.transition = 'transform 240ms var(--ease-out), opacity 240ms var(--ease-out)'
+        card.style.transform = ''
+        card.style.opacity = ''
+        overlay.style.transition = 'background-color 240ms var(--ease-out)'
+        overlay.style.backgroundColor = ''
+        setTimeout(() => {
+          reset()
+          overlay.style.transition = ''
+        }, 250)
+      }
+    }
+
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', end)
     window.addEventListener('pointercancel', end)
@@ -829,12 +892,12 @@ const moreRef = useRef(null)
       <button className="icon-btn" onClick={() => playIndex(nextIndex())} disabled={!canNext} aria-label="Next song"><SkipForward size={17} /></button>
     </div>}
 
-    {fullOpen && <div className="np-overlay" role="dialog" aria-modal="true" aria-label="Now playing"
+    {fullOpen && <div ref={overlayRef} className="np-overlay" role="dialog" aria-modal="true" aria-label="Now playing"
       onMouseDown={(event) => { if (event.target === event.currentTarget) collapse() }}>
-      <section className="np-card">
+      <section ref={cardRef} className="np-card">
         <div className="np-backdrop" style={{ backgroundImage: `url("${art}")` }} aria-hidden="true" />
 
-        <header className="np-top">
+        <header className="np-top" onPointerDown={startDismissSwipe}>
           <button
             className="np-icon"
             onClick={view === 'player' ? collapse : view === 'queue' ? closeQueue : () => setView('player')}
@@ -882,7 +945,7 @@ const moreRef = useRef(null)
 
               </li>)}
             </ul>
-            : <div className={`np-body${showLyrics ? '' : ' no-lyrics'}`} onPointerDown={startSwipe}>
+            : <div className={`np-body${showLyrics ? '' : ' no-lyrics'}`} onPointerDown={(event) => { startSwipe(event); startDismissSwipe(event) }}>
               <div ref={stageRef} className={`np-stage${lyricsFullOn ? ' is-lyrics' : ''}${slideDir ? ` slide-from-${slideDir}` : ''}`}>
                 {lyricsFullOn
                   ? <>

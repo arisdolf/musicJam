@@ -103,7 +103,7 @@ export default function HomeSearch({ onPlaySong, onQueueTrack, className = '' })
         </div>
 
         {showPanel && <div className={`results hs-results${waiting ? ' is-stale' : ''}`}>
-            {waiting && !results.length && <TrackSkeletonList count={3} className="search-skeleton" />}
+            {waiting && !results.length && <TrackSkeletonList count={3} actions={4} className="search-skeleton" />}
             {error && <p className="message">{error}</p>}
             {results.map((track) => {
                 const queued = queuedIds.includes(track.id)

@@ -232,3 +232,37 @@ button, a, input, [role="button"], [role="checkbox"] { touch-action: manipulatio
 .np-body:not(.no-lyrics) .np-stage:not(.is-lyrics) {
   width: min(100%, clamp(110px, calc(var(--np-h) - 520px), 42dvh));
 }
+
+/* Touch devices keep :hover matched after a tap; reserve hover feedback for hover pointers. */
+@media (hover: none) {
+  :focus:not(:focus-visible) { outline: none; }
+  button:hover:not(:disabled) { transform: none !important; filter: none !important; }
+  .btn:hover:not(:disabled) { background: var(--bg); border-color: var(--line); box-shadow: none; filter: none; }
+  .btn-primary:hover:not(:disabled) { background: var(--spot); border-color: transparent; box-shadow: var(--glow); color: #fff; }
+  .btn-danger:hover:not(:disabled) { background: var(--danger); border-color: var(--danger); color: var(--on-danger); }
+  .btn-text:hover:not(:disabled) { background: none; border-color: transparent; }
+  .btn-leave:hover:not(:disabled) { background: var(--surface); border-color: var(--line); }
+  .icon-btn:hover:not(:disabled):not(.active):not(.add-btn) { background: none; color: var(--muted); transform: none; }
+  .icon-btn.active:hover:not(:disabled), .add-btn:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent-dark); }
+  .save-track-btn:hover:not(:disabled):not(.is-saved) { color: var(--muted); }
+  .np-card .icon-btn:hover:not(:disabled):not(.active) { background: none; color: rgba(255,255,255,.8); }
+  .np-icon:hover:not(:disabled) { background: none; color: rgba(255,255,255,.88); }
+  .np-circle:hover:not(:disabled):not(.active) { background: rgba(255,255,255,.16); color: #fff; }
+  .np-play:hover:not(:disabled) { background: #fff; filter: none; transform: none; }
+  .mini-play:hover:not(:disabled) { background: var(--accent); filter: none; transform: none; }
+  .modal-close:hover:not(:disabled), .dots-item:hover:not(:disabled), .popover-item:hover:not(:disabled),
+  .np-menu button:hover { background: none; }
+  .sidenav-item:hover:not(.active) { background: none; color: var(--muted); }
+  .theme-option:hover:not(.active) { background: var(--bg); color: var(--muted); }
+  .category-chip:hover:not(.active) { background: var(--bg); }
+  .chip:hover { background: var(--bg); transform: none; }
+  .track-play:hover:not(:disabled) { transform: none; color: var(--muted); }
+  .queue-move-btn:hover:not(:disabled) { background: none; color: inherit; }
+  .playlist-search .search-clear:hover:not(:disabled), .room-search-input .search-clear:hover:not(:disabled),
+  .np-search-clear:hover:not(:disabled), .hs-clear:hover:not(:disabled) { background: transparent; color: var(--muted); }
+  .playlist-card:hover { border-color: var(--line); box-shadow: none; }
+  .playlist-card:hover .playlist-card-play { opacity: 0; transform: translateY(6px) scale(.85); background: var(--accent-soft); color: var(--accent-dark); box-shadow: none; }
+  .playlist-card-open:focus-visible .playlist-card-play { opacity: 1; transform: none; }
+  .np-card .lyric-offset button:hover:not(:disabled), .lyric-offset button:hover:not(:disabled) { background: none; color: inherit; }
+  .lyric-offset > span[role="button"]:hover { color: inherit; }
+}

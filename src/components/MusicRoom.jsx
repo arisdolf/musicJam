@@ -8,7 +8,7 @@ import InviteFriendsModal from './InviteFriendsModal'
 import { useTopbar } from './TopBarContext'
 import LikeButton from './LikeButton'
 import TrackMenu, { DotsMenu } from './TrackMenu'
-import { TrackSkeletonList } from './Skeleton'
+import { PlaylistListSkeleton, TrackSkeletonList } from './Skeleton'
 import { Play, Search, Music2, Check, X, Plus, Trash2, GripVertical, ListMusic, ListPlus, ChevronDown, LogOut, UserPlus, Sparkles } from 'lucide-react'
 
 export default function MusicRoom({ roomCode, room, updateRoom, connection, members, onLeave, onPlayTrack, onQueueTrack, onPlayTracks, onQueueTracks, onPlayNext }) {
@@ -152,7 +152,7 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
         <button type="button" className="search-clear" onClick={() => setQuery('')} disabled={!query} aria-label="Clear song search"><X size={17} /></button>
       </div>
       {query && <div className="results">
-        {searching ? <TrackSkeletonList count={3} className="search-skeleton" />
+        {searching ? <TrackSkeletonList count={3} actions={4} className="search-skeleton" />
           : searchError ? <p className="message">{searchError}</p>
 
             : results.map((track) => <SongRow key={track.id} track={track} queued={queueIds.includes(track.id)} onPlayTrack={onPlayTrack} onPlayNext={onPlayNext} onQueueTrack={onQueueTrack} />)}
@@ -164,7 +164,7 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
         {similar.tracks.length > 0 && <button className="btn btn-small" onClick={() => onQueueTracks(similar.tracks)}><ListPlus size={14} /> Add all</button>}
       </div>
       <div className="results similar-results">
-        {similar.loading ? <TrackSkeletonList count={3} className="search-skeleton" />
+        {similar.loading ? <TrackSkeletonList count={3} actions={4} className="search-skeleton" />
           : similar.error ? <p className="message">{similar.error}</p>
             : similar.tracks.map((track) => <SongRow key={track.id} track={track} queued={queueIds.includes(track.id)} onPlayTrack={onPlayTrack} onPlayNext={onPlayNext} onQueueTrack={onQueueTrack} />)}
       </div>
@@ -263,7 +263,7 @@ function RoomPlaylists({ onPlayTracks, onQueueTracks, onPlayTrack, onQueueTrack 
     </div>
   }
   if (playlistsError) return <p className="message">{playlistsError}</p>
-  if (!playlistsReady) return <TrackSkeletonList count={3} className="search-skeleton" />
+  if (!playlistsReady) return <PlaylistListSkeleton count={3} />
   if (!playlists.length) return <p className="empty">You have no playlists yet. Save songs with the heart button.</p>
 
   return <ul className="track-list room-playlists">

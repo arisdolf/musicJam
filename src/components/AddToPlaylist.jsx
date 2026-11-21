@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, Heart, LogIn, Plus, UserPlus } from 'lucide-react'
-import { Skeleton, TrackSkeletonList } from './Skeleton'
+import { PlaylistListSkeleton, Skeleton } from './Skeleton'
 import { useAccount } from '../features/account/AccountContext'
 import { rubberBandAtBounds } from '../utils/motion'
 
@@ -160,7 +160,7 @@ export default function AddToPlaylist({ track, hideButton = false, open: openPro
         {playlistsError
           ? <p className="popover-state" role="alert">{playlistsError}</p>
           : !playlistsReady
-            ? <TrackSkeletonList count={3} className="skeleton-popover-list" />
+            ? <PlaylistListSkeleton count={3} className="skeleton-popover-list" />
             : own.length === 0
               ? <p className="popover-state">You have no playlists yet. Name one below to save this song.</p>
               : <div className="popover-list" role="group" aria-label="Your playlists" onWheel={(event) => rubberBandAtBounds(event.currentTarget, event.deltaY)}>

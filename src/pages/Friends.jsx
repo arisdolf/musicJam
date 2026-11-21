@@ -5,7 +5,7 @@ import { useFriends } from '../features/friends/FriendsContext'
 import UsernameForm from '../components/UsernameForm'
 import FeedbackModal from '../components/FeedbackModal'
 import ConfirmModal from '../components/ConfirmModal'
-import { Skeleton, TrackSkeletonList } from '../components/Skeleton'
+import { FriendRowsSkeleton, Skeleton } from '../components/Skeleton'
 
 function NotificationPrompt() {
   const [permission, setPermission] = useState(typeof Notification === 'undefined' ? 'unsupported' : Notification.permission)
@@ -76,7 +76,7 @@ export default function Friends({ roomCode }) {
     <div className="playlist-page-heading"><span className="page-icon"><Users size={21} /></span><div><h1>Friends</h1><p className="muted">Add friends and invite them to your room.</p></div></div>
 
     {!profileReady
-      ? <TrackSkeletonList count={3} className="search-skeleton" />
+      ? <FriendRowsSkeleton count={3} />
       : !username
         ? <section className="settings-card">
             <div className="settings-card-header"><AtSign size={18} /><h2>Choose your username</h2></div>

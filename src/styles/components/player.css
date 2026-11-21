@@ -24,7 +24,8 @@
   .np-card { width: 100%; height: 100dvh; border-radius: 0; padding-top: env(safe-area-inset-top, 0px); }
 }
 
-.np-top { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 6px; }
+.np-top { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 6px; touch-action: none; cursor: grab; }
+.np-top::before { content: ""; position: absolute; top: 5px; left: 50%; width: 34px; height: 4px; border-radius: 999px; background: rgba(255,255,255,.28); transform: translateX(-50%); }
 .np-kicker { font-size: 11px; font-weight: 800; letter-spacing: .12em; color: rgba(255,255,255,.7); }
 .np-top-spacer { width: 40px; }
 .np-icon { width: 40px; height: 40px; flex: 0 0 auto; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; color: rgba(255,255,255,.88); }
@@ -33,6 +34,7 @@
 
 .np-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; padding: 6px 24px 8px; }
 .np-stage { width: min(100%, 42dvh); aspect-ratio: 1; margin: 0 auto; flex: 0 0 auto; }
+.np-stage:not(.is-lyrics) { touch-action: none; }
 .np-stage.is-lyrics { width: 100%; aspect-ratio: auto; flex: 1; min-height: 160px; display: flex; flex-direction: column; border-radius: 20px; background: rgba(0,0,0,.28); overflow: hidden; }
 .np-art { width: 100%; height: 100%; display: block; object-fit: cover; border-radius: 24px; background: rgba(255,255,255,.08); box-shadow: 0 18px 48px rgba(0,0,0,.45); animation: pop-in 420ms var(--spring) backwards; }
 

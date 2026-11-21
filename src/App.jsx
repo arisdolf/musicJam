@@ -224,7 +224,7 @@ const renderContent = () => {
         <div className="app-body">
           <ErrorBoundary label="This page" resetKey={`${view}:${roomCode || 'local'}`}>
             <div className="route-stage" key={`${view}:${roomCode || 'local'}`}>
-              <Suspense fallback={<PageSkeleton />}>
+              <Suspense fallback={<PageSkeleton view={view} roomCode={roomCode} settingsSection={settingsSection} />}>
                 {renderContent()}
               </Suspense>
             </div>
