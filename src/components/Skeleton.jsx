@@ -142,3 +142,13 @@ export function LyricsSkeleton() {
     <Skeleton className="lyrics-line medium" />
   </div>
 }
+
+export function Spinner({ size = 18, thickness = 2, label, className = '' }) {
+  return <span
+    className={`spinner ${className}`}
+    style={{ '--size': `${size}px`, '--thick': `${thickness}px` }}
+    role={label ? 'status' : undefined}
+    aria-label={label}
+    aria-hidden={label ? undefined : true}
+  />
+}

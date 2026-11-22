@@ -68,7 +68,7 @@ export function DotsMenu({ items, label = 'More options', buttonRef, className =
 //   onQueue   -> "Add to queue" (receives the 3-dot button so the add animation can start there)
 //   queued    -> shows "In queue" and disables the item
 //   onPlayNext, onRemove -> as before (queue rows)
-export default function TrackMenu({ track, onPlay, onQueue, queued = false, onPlayNext, onRemove, playNextDisabled }) {
+export default function TrackMenu({ track, onPlay, onQueue, queued = false, onPlayNext, onRemove, removeLabel = 'Remove from queue', playNextDisabled }) {
   const buttonRef = useRef(null)
   const [playlistOpen, setPlaylistOpen] = useState(false)
 
@@ -82,7 +82,7 @@ export default function TrackMenu({ track, onPlay, onQueue, queued = false, onPl
   })
   items.push({ label: 'Add to playlist', icon: <ListPlus size={16} />, onClick: () => setPlaylistOpen(true) })
   if (onPlayNext) items.push({ label: 'Play next', icon: <ListStart size={16} />, onClick: onPlayNext, disabled: playNextDisabled })
-  if (onRemove) items.push({ label: 'Remove from queue', icon: <Trash2 size={16} />, onClick: onRemove, danger: true })
+    if (onRemove) items.push({ label: removeLabel, icon: <Trash2 size={16} />, onClick: onRemove, danger: true })
 
   return <>
     <DotsMenu buttonRef={buttonRef} label={`More options for ${track.title}`} items={items} />

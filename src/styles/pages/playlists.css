@@ -69,7 +69,7 @@
   .playlist-track { gap: 6px; padding: 8px 2px; }
   .playlist-track img { width: 46px; height: 34px; }
   .playlist-track .track-play { width: 28px; }
-  .playlist-track .icon-btn { width: 32px; height: 34px; }
+  .playlist-track .track-actions .icon-btn { width: 36px; height: 36px; }
   .playlist-track .track-text strong { font-size: 12px; }
   .playlist-track .track-text small { font-size: 10px; }
 }

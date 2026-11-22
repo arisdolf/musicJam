@@ -13,6 +13,10 @@ const QUOTA_REASONS = ['quotaExceeded', 'dailyLimitExceeded', 'RESOURCE_EXHAUSTE
 
 // ── Quota tracking (local to this browser) ────────────────────────────────────
 export const QUOTA_LIMIT = 10000
+// Song length window. Raise MAX_SONG_SECONDS if you want to allow longer tracks.
+export const MIN_SONG_SECONDS = 90
+export const MAX_SONG_SECONDS = 450 // 7:30
+
 const COSTS = { search: 100, videos: 1 }
 const USAGE_KEY = 'jamroom:yt-usage'
 
@@ -93,7 +97,7 @@ function audioScore(item, seconds) {
   const isVevo = /vevo$/i.test(channel)
 
   if (NOT_A_SONG.test(title)) return null
-  if (seconds < 90 || seconds > 480) return null // 1:30 to 8:00 keeps out intros/skits and long extras
+  if (seconds < MIN_SONG_SECONDS || seconds > MAX_SONG_SECONDS) return null
 
   const audio = IS_AUDIO.test(title)
   const mv = IS_MV.test(title)
@@ -120,7 +124,7 @@ function isPopular(track, strictness = 1) {
 
 
 // ── Core search ───────────────────────────────────────────────────────────────
-function searchMusic(query, { signal, limit, order, extra = {} }) {
+export function searchMusic(query, { signal, limit, order, extra = {} }) {
   return cached(`${order}|${JSON.stringify(extra)}|${query.toLowerCase()}`, async () => {
     const search = await yt('search', {
       part: 'snippet', type: 'video', videoCategoryId: '10',
@@ -227,7 +231,8 @@ async function cached(key, load) {
   const hit = cache.get(key)
   if (hit && Date.now() - hit.time < CACHE_TTL) return hit.value
   const value = await load()
-  if (value.length) cache.set(key, { time: Date.now(), value })
+  const size = Array.isArray(value) ? value.length : value?.tracks?.length
+  if (size) cache.set(key, { time: Date.now(), value })
   return value
 }
 
@@ -441,41 +446,37 @@ export function getSimilarTracks(seed, signal) {
   })
 }
 
-// ── Fast search for the home search box ───────────────────────────────────────
-// One API call and 12 results, and no per-video filtering. Duration and views are filled in
-// later by getTrackDetails, only for the song the listener actually picks.
-const decodeHtml = (text) => {
-  const el = document.createElement('textarea')
-  el.innerHTML = text
-  return el.value
-}
 
-export function quickSearch(query, signal) {
-  return cached(`quick|${query.toLowerCase()}`, async () => {
+// ── Paged song search (home search box, infinite scroll) ──────────────────────
+// Each page costs ~101 quota units (100 search + 1 details). The details call is what lets us
+// check the category and the length, so only real songs of a sensible length come back.
+export function searchSongsPage(query, pageToken, signal) {
+  return cached(`page|${query.toLowerCase()}|${pageToken || 'first'}`, async () => {
     const search = await yt('search', {
       part: 'snippet', type: 'video', videoCategoryId: '10',
       videoEmbeddable: 'true', videoSyndicated: 'true', regionCode: REGION,
-      maxResults: '12', order: 'relevance', q: `${query} audio`,
+      maxResults: '25', order: 'relevance', q: `${query} audio`,
+      ...(pageToken ? { pageToken } : {}),
     }, signal)
-    return (search.items || [])
-      .filter((item) => item.id?.videoId && !NOT_A_SONG.test(item.snippet?.title || ''))
-      .map((item) => {
-  const { snippet } = item
-  const id = item.id.videoId
-  const rawTitle = decodeHtml(snippet.title)
-  const info = cleanTrackInfo(rawTitle, decodeHtml(snippet.channelTitle))
-  return {
-    id,
-    title: info.title,
-    artist: info.artist,
-    rawTitle,
-    channel: snippet.channelTitle,
-    thumbnail: snippet.thumbnails?.medium?.url || `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
-    duration: 0,
-    views: 0,
-    year: Number((snippet.publishedAt || '').slice(0, 4)) || 0,
-  }
-})
+    const nextPageToken = search.nextPageToken || ''
+    const ids = (search.items || []).map((item) => item.id?.videoId).filter(Boolean)
+    if (!ids.length) return { tracks: [], nextPageToken }
+
+    const details = await yt('videos', {
+      part: 'snippet,status,contentDetails,statistics', id: ids.join(','),
+    }, signal)
+    const byId = new Map((details.items || []).map((item) => [item.id, item]))
+
+    const tracks = []
+    for (const id of ids) {
+      const item = byId.get(id)
+      if (!item || !isPlayable(item, REGION)) continue          // must be music (category 10) and playable
+      if (NOT_A_SONG.test(item.snippet?.title || '')) continue  // reactions, tutorials, shorts, etc.
+      const track = toTrack(item)
+      if (track.duration < MIN_SONG_SECONDS || track.duration > MAX_SONG_SECONDS) continue
+      tracks.push(track)
+    }
+    return { tracks, nextPageToken }
   })
 }
 
@@ -506,7 +507,7 @@ export function getTrending(signal) {
         if (!isPlayable(item, REGION)) continue
         if (NOT_A_SONG.test(item.snippet?.title || '')) continue
         const track = toTrack(item)
-        if (track.duration < 90 || track.duration > 480) continue
+        if (track.duration < MIN_SONG_SECONDS || track.duration > MAX_SONG_SECONDS) continue
         tracks.push(track)
       }
       pageToken = data.nextPageToken || ''

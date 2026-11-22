@@ -5,12 +5,12 @@ import { useAccount } from '../features/account/AccountContext'
 import { rubberBandAtBounds } from '../utils/motion'
 import AddToPlaylist from './AddToPlaylist'
 import { useDragReorder } from '../hooks/useDragReorder'
-import { searchYouTube } from '../services/youtube'
 import { playNext } from '../utils/queue'
 import LikeButton from './LikeButton'
 import TrackMenu from './TrackMenu'
+import { useSongSearch } from '../hooks/useSongSearch'
 import ConfirmModal from './ConfirmModal'
-import { LyricsSkeleton, Skeleton } from './Skeleton'
+import { LyricsSkeleton, Skeleton, Spinner } from './Skeleton'
 import {
   ArrowLeft, Check, ChevronDown, Disc3, GripVertical, ListMusic, ListOrdered, LogIn, Mic2, MicOff, Minus, MoreVertical,
   Pause, Play, Plus, Repeat1, Search, Shuffle, SkipBack, SkipForward, Timer, TimerOff, Trash2, ListStart, ListPlus, X
@@ -136,6 +136,7 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
   const showPause = playerReady && playbackPlaying && (ytState === 1 || ytState === 3)
   const currentTrack = playbackQueue[playbackCurrent] || null
   const currentTrackId = currentTrack?.id
+  const loading = playbackPlaying && Boolean(currentTrack) && (!playerReady || ytState === 3)
   const hasCurrentTrack = Boolean(currentTrackId)
   const currentTrackLyricsId = currentTrack?.lyricsId
   const currentTrackTitle = currentTrack?.title
@@ -1024,9 +1025,11 @@ useEffect(() => {
         </span>
       </button>
       <button className="icon-btn" onClick={() => playIndex(playbackCurrent - 1)} disabled={!canPrev} aria-label="Previous song"><SkipBack size={17} /></button>
-      <button className="mini-play" onClick={togglePlay} aria-label={showPause ? 'Pause' : 'Play'}>
-        <span key={showPause ? 'pause' : 'play'} className="motion-icon">{showPause ? <Pause size={17} /> : <Play size={17} fill="currentColor" />}</span>
-      </button>
+      <button className="mini-play" onClick={togglePlay} aria-label={loading ? 'Loading. Tap to pause' : showPause ? 'Pause' : 'Play'}>
+  <span key={loading ? 'loading' : showPause ? 'pause' : 'play'} className="motion-icon">
+    {loading ? <Spinner size={20} /> : showPause ? <Pause size={17} /> : <Play size={17} fill="currentColor" />}
+  </span>
+</button>
       <button className="icon-btn" onClick={() => playIndex(nextIndex())} disabled={!canNext} aria-label="Next song"><SkipForward size={17} /></button>
     </div>}
 
@@ -1154,9 +1157,11 @@ useEffect(() => {
             aria-label={`${MODES[mode].label}. Tap to change playback mode`}
           ><ModeIcon size={17} /></button>
           <button className="np-icon" onClick={() => playIndex(playbackCurrent - 1)} disabled={!canPrev} aria-label="Previous song"><SkipBack size={22} fill="currentColor" /></button>
-          <button className="np-play" onClick={togglePlay} aria-label={showPause ? 'Pause' : 'Play'}>
-            <span key={showPause ? 'pause' : 'play'} className="motion-icon">{showPause ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}</span>
-          </button>
+         <button className="np-play" onClick={togglePlay} aria-label={loading ? 'Loading. Tap to pause' : showPause ? 'Pause' : 'Play'}>
+  <span key={loading ? 'loading' : showPause ? 'pause' : 'play'} className="motion-icon">
+    {loading ? <Spinner size={28} thickness={3} /> : showPause ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}
+  </span>
+</button>
           <button className="np-icon" onClick={() => playIndex(nextIndex())} disabled={!canNext} aria-label="Next song"><SkipForward size={22} fill="currentColor" /></button>
           <button className={`np-circle${queueActive ? ' active' : ''}`} onClick={toggleQueue} aria-label="Queue" aria-pressed={queueActive}><ListMusic size={17} /></button>
         </footer>
@@ -1279,31 +1284,26 @@ function findLyricIndex(lines, currentTime) {
 function SongSearch({ queuedIds, onPlay, onQueue, onPlayNext, exiting = false }) {
   const [query, setQuery] = useState('')
   const inputRef = useRef(null)
-  const [state, setState] = useState({ query: '', results: [], searching: false, error: '' })
-  const q = query.trim()
-  const hasResult = state.query === q
-  const results = hasResult ? state.results : []
-  const searching = Boolean(q && (!hasResult || state.searching))
-  const error = hasResult ? state.error : ''
+  const listRef = useRef(null)
+  const endRef = useRef(null)
+  const search = useSongSearch(query)
+  const q = search.q
+  const results = search.tracks
+  const searching = search.waiting && !results.length
+  const error = search.waiting ? '' : search.error
 
+  // Load the next page when the bottom of the list scrolls into view.
   useEffect(() => {
-    if (!q) return undefined
-    const controller = new AbortController()
-    const timer = setTimeout(async () => {
-      setState({ query: q, results: [], searching: true, error: '' })
-      try {
-        const tracks = await searchYouTube(q, controller.signal)
-        if (!controller.signal.aborted) {
-          setState({ query: q, results: tracks, searching: false, error: tracks.length ? '' : 'No songs found. Try another search.' })
-        }
-      } catch (err) {
-        if (err.name !== 'AbortError' && !controller.signal.aborted) {
-          setState({ query: q, results: [], searching: false, error: err.message || 'Song search failed.' })
-        }
-      }
-    }, 300)
-    return () => { clearTimeout(timer); controller.abort() }
-  }, [q])
+    const root = listRef.current
+    const node = endRef.current
+    if (!root || !node || !search.hasMore) return undefined
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) search.loadMore() },
+      { root, rootMargin: '0px 0px 160px 0px' },
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [search.hasMore, search.loadMore, results.length])
 
   return <div className={`np-search${exiting ? ' is-exiting' : ''}`}>
     <div className="np-search-input">
@@ -1317,15 +1317,15 @@ function SongSearch({ queuedIds, onPlay, onQueue, onPlayNext, exiting = false })
       />
       <button type="button" className="np-search-clear" onClick={() => { setQuery(''); inputRef.current?.focus() }} disabled={!query} aria-label="Clear song search"><X size={17} /></button>
     </div>
-    <ul className="np-queue-list" onWheel={(event) => rubberBandAtBounds(event.currentTarget, event.deltaY)}>
+    <ul ref={listRef} className="np-queue-list" onWheel={(event) => rubberBandAtBounds(event.currentTarget, event.deltaY)}>
       {!q && <li className="np-search-note">Type a song or artist to add it.</li>}
       {searching && Array.from({ length: 3 }, (_, index) => <li className="np-search-loading" key={`search-skeleton-${index}`} aria-hidden="true">
         <Skeleton className="np-search-cover" />
         <span className="np-search-copy"><Skeleton /><Skeleton /></span>
         <span className="np-search-actions"><Skeleton className="np-search-action" /><Skeleton className="np-search-action" /></span>
       </li>)}
-      {!searching && error && <li className="np-search-note">{error}</li>}
-      {!searching && results.map((track) => {
+      {!searching && error && !results.length && <li className="np-search-note">{error}</li>}
+      {results.map((track) => {
         const queued = queuedIds.includes(track.id)
         return <li key={track.id}>
           <button className="np-queue-track" onClick={() => onPlay?.(track)}>
@@ -1338,6 +1338,7 @@ function SongSearch({ queuedIds, onPlay, onQueue, onPlayNext, exiting = false })
           </button>
         </li>
       })}
+      {search.hasMore && <li ref={endRef} className="np-search-more">{search.loadingMore && <Spinner size={20} label="Loading more songs" />}</li>}
     </ul>
   </div>
 }

@@ -1,85 +1,69 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, Play, Plus, Search, X } from 'lucide-react'
-import { quickSearch, getTrackDetails } from '../services/youtube'
-import { Skeleton, TrackSkeletonList } from './Skeleton'
-
+import { Search, X } from 'lucide-react'
+import { useSongSearch } from '../hooks/useSongSearch'
+import { Spinner, TrackSkeletonList } from './Skeleton'
 import LikeButton from './LikeButton'
 import TrackMenu from './TrackMenu'
 
-const IDLE = { query: '', status: 'idle', results: [], error: '' }
-const DEBOUNCE_MS = 300   // wait this long after the last keystroke
-const MIN_CHARS = 3       // don't search for 1 or 2 letters
+const MIN_CHARS = 3
 
 export default function HomeSearch({ onPlaySong, onQueueTrack, className = '' }) {
     const [open, setOpen] = useState(false)
     const [query, setQuery] = useState('')
-    const [state, setState] = useState(IDLE)
     const [busyId, setBusyId] = useState('')
+    const [playingId, setPlayingId] = useState('')
     const [queuedIds, setQueuedIds] = useState([])
     const inputRef = useRef(null)
-    const q = query.trim()
+    const resultsRef = useRef(null)
+    const sentinelRef = useRef(null)
+    const { q, tracks: results, error: searchError, waiting, loadingMore, hasMore, loadMore } = useSongSearch(query, { minChars: MIN_CHARS })
 
-    // Search automatically after the user pauses typing.
+    const error = waiting ? '' : searchError
+    const showPanel = open && q.length >= MIN_CHARS && (results.length > 0 || waiting || Boolean(error))
+
+    // Load the next page when the bottom of the list scrolls into view.
     useEffect(() => {
-        if (q.length < MIN_CHARS) return undefined
-        const controller = new AbortController()
-        const timer = setTimeout(async () => {
-            setState((prev) => ({ ...prev, query: q, status: 'loading', error: '' })) // keeps the old results visible
-            try {
-                const results = await quickSearch(q, controller.signal)
-                if (controller.signal.aborted) return
-                setState({ query: q, status: 'done', results, error: results.length ? '' : 'No songs found. Try another search.' })
-            } catch (error) {
-                if (error.name === 'AbortError' || controller.signal.aborted) return
-                setState({ query: q, status: 'done', results: [], error: error.message || 'Search failed.' })
-            }
-        }, DEBOUNCE_MS)
-        return () => { clearTimeout(timer); controller.abort() }
-    }, [q])
+        const root = resultsRef.current
+        const node = sentinelRef.current
+        if (!root || !node || !hasMore) return undefined
+        const observer = new IntersectionObserver(
+            ([entry]) => { if (entry.isIntersecting) loadMore() },
+            { root, rootMargin: '0px 0px 180px 0px' },
+        )
+        observer.observe(node)
+        return () => observer.disconnect()
+    }, [hasMore, loadMore, results.length, showPanel])
 
-    const openBar = () => {
-        setOpen(true)
-        inputRef.current?.focus()
-    }
+    const openBar = () => { setOpen(true); inputRef.current?.focus() }
 
     const closeBar = () => {
-        setOpen(false)
-        setQuery('')
-        setState(IDLE)
-        setQueuedIds([])
+        setOpen(false); setQuery('')
+        setQueuedIds([]); setPlayingId('')
     }
 
     const clearQuery = () => {
-        setQuery('')
-        setState(IDLE)
-        setQueuedIds([])
+        setQuery(''); setQueuedIds([]); setPlayingId('')
         inputRef.current?.focus()
     }
 
     const clearOrClose = () => query.trim() ? clearQuery() : closeBar()
+    const submit = (event) => { event.preventDefault(); inputRef.current?.blur() }
 
-    // Enter still works: it just blurs the input so the phone keyboard closes.
-    const submit = (event) => {
-        event.preventDefault()
-        inputRef.current?.blur()
-    }
-
-    const choose = async (track) => {
+    // Playing keeps the results open so you can keep picking songs.
+    const choose = (track) => {
         if (busyId) return
         setBusyId(track.id)
-        try { await onPlaySong(await getTrackDetails(track)) }
-        finally { setBusyId(''); closeBar() }
+        try {
+            onPlaySong(track) // similar songs load in the background
+            setPlayingId(track.id)
+            setQueuedIds((ids) => ids.includes(track.id) ? ids : [...ids, track.id])
+        } finally { setBusyId('') }
     }
 
     const queue = (track, trigger) => {
         onQueueTrack?.(track, trigger)
         setQueuedIds((ids) => ids.includes(track.id) ? ids : [...ids, track.id])
     }
-
-    const waiting = q.length >= MIN_CHARS && (state.query !== q || state.status === 'loading')
-    const results = state.results
-    const error = waiting ? '' : state.error
-    const showPanel = open && q.length >= MIN_CHARS && (results.length > 0 || waiting || Boolean(error))
 
     return <div className={`home-search${className ? ` ${className}` : ''}${open ? ' is-open' : ''}`}>
         <div className={`hs-bar${open ? ' open' : ''}`}>
@@ -102,29 +86,34 @@ export default function HomeSearch({ onPlaySong, onQueueTrack, className = '' })
             </form>
         </div>
 
-        {showPanel && <div className={`results hs-results${waiting ? ' is-stale' : ''}`}>
-            {waiting && !results.length && <TrackSkeletonList count={3} actions={4} className="search-skeleton" />}
-            {error && <p className="message">{error}</p>}
+        {showPanel && <div ref={resultsRef} className={`results hs-results${waiting ? ' is-stale' : ''}`}>
+            {waiting && !results.length && <TrackSkeletonList count={4} actions={2} className="search-skeleton" />}
+            {error && !results.length && <p className="message">{error}</p>}
             {results.map((track) => {
-                const queued = queuedIds.includes(track.id)
-                return <div className={`track hs-row${busyId === track.id ? ' is-busy' : ''}`} key={track.id}>
-                    <img src={track.thumbnail} alt="" loading="lazy" decoding="async" />
-                    <button className="track-text as-button" onClick={() => choose(track)} disabled={Boolean(busyId)}>
+                const busy = busyId === track.id
+                const playing = playingId === track.id
+                return <div className={`track hs-row${playing ? ' active' : ''}`} key={track.id} aria-busy={busy || undefined}>
+                    <span className={`hs-art${playing && !busy ? ' is-playing' : ''}`}>
+                        <img src={track.thumbnail} alt="" loading="lazy" decoding="async" />
+                        {busy && <span className="hs-art-state"><Spinner size={20} label="Loading song" /></span>}
+                        {playing && !busy && <span className="eq-bars" aria-hidden="true"><i /><i /><i /></span>}
+                    </span>
+                    <button className="track-text as-button" onClick={() => choose(track)} aria-label={`Play ${track.title}`}>
                         <strong>{track.title}</strong><small>{track.artist}</small>
                     </button>
                     <div className="track-actions">
                         <LikeButton track={track} />
-                        <button className="icon-btn" onClick={() => choose(track)} disabled={Boolean(busyId)} aria-label={`Play ${track.title}`} title="Play now">
-                            {busyId === track.id ? <Skeleton className="skeleton-button" /> : <Play size={16} fill="currentColor" />}
-                        </button>
-                        <button className="icon-btn add-btn" onClick={(event) => queue(track, event.currentTarget)} disabled={queued} aria-label={`Add ${track.title} to queue`} title={queued ? 'In queue' : 'Add to queue'}>
-                            {queued ? <Check size={16} /> : <Plus size={17} />}
-                        </button>
-                        <TrackMenu track={track} />
+                        <TrackMenu
+                            track={track}
+                            onPlay={() => choose(track)}
+                            onQueue={(trigger) => queue(track, trigger)}
+                            queued={queuedIds.includes(track.id)}
+                        />
                     </div>
                 </div>
             })}
-            {busyId && <p className="message">Playing, and adding similar songs to your queue…</p>}
+            {hasMore && <div ref={sentinelRef} className="hs-more">{loadingMore && <Spinner size={20} label="Loading more songs" />}</div>}
+            {error && results.length > 0 && <p className="message">{error}</p>}
         </div>}
     </div>
 }

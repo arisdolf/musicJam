@@ -22,3 +22,10 @@
 .hs-row.is-busy { opacity: .7; }
 
 .hs-results.is-stale .track { opacity: .55; transition: opacity 150ms; }
+
+.hs-art { position: relative; flex: none; display: block; width: 52px; height: 38px; overflow: hidden; border-radius: 6px; background: var(--surface); }
+.hs-art img { width: 100%; height: 100%; display: block; }
+.hs-art-state { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.55); color: #fff; animation: fade-in 120ms var(--ease-out) backwards; }
+.hs-art.is-playing::before { content: ""; position: absolute; inset: 0; background: rgba(0,0,0,.5); }
+@media (max-width: 480px) { .hs-art { width: 44px; height: 32px; } }
+.hs-more { display: grid; place-items: center; min-height: 44px; color: var(--muted); }

@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { useAccount } from '../features/account/AccountContext'
-import { ArrowLeft, Heart, Check, Disc3, GripVertical, ListMusic, Music2, Pencil, Play, Plus, Search, Trash2, X, ListPlus, Upload } from 'lucide-react'
-import { Skeleton } from '../components/Skeleton'
+import { Heart, Check, Disc3, GripVertical, ListMusic, Music2, Pencil, Play, Plus, Search, Trash2, X, Upload } from 'lucide-react'
+import { Skeleton, Spinner } from '../components/Skeleton'
 import FeedbackModal from '../components/FeedbackModal'
 import ConfirmModal from '../components/ConfirmModal'
 import { layoutTransitionName, withViewTransition } from '../utils/viewTransitions'
@@ -9,7 +9,8 @@ import { parseExportifyCsv } from '../services/importCsv'
 import { matchSong } from '../services/youtube'
 import { useTopbar } from '../components/TopBarContext'
 import { useDragReorder } from '../hooks/useDragReorder'
-
+import LikeButton from '../components/LikeButton'
+import TrackMenu from '../components/TrackMenu'
 
 export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
   const IMPORT_LIMIT = 100 // each song costs ~101 YouTube quota units; the free daily quota is 10,000
@@ -133,7 +134,7 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
       while (!controller.signal.aborted && !stopReason) {
         const index = next++
         if (index >= songs.length) return
-        try { matched[index] = await matchSong(songs[index], controller.signal, ) }
+        try { matched[index] = await matchSong(songs[index], controller.signal,) }
         catch (err) {
           if (err.name === 'AbortError') return
           if (QUOTA_REASONS.includes(err.reason) || /API key/i.test(err.message)) stopReason = err.message
@@ -205,7 +206,7 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
               <button className="icon-btn" type="button" aria-label="Cancel rename" onClick={() => setEditing(false)}><X size={17} /></button>
             </form>
             : <div className="playlist-title-row"><h1>{selected.name}</h1>
-            {!selected.isLiked && <button className="icon-btn" onClick={() => { setEditName(selected.name); setEditing(true); setError('') }} aria-label="Rename playlist"><Pencil size={16} /></button>}</div>}
+              {!selected.isLiked && <button className="icon-btn" onClick={() => { setEditName(selected.name); setEditing(true); setError('') }} aria-label="Rename playlist"><Pencil size={16} /></button>}</div>}
           <p className="muted">{selected.tracks.length} {selected.tracks.length === 1 ? 'track' : 'tracks'} · Your saved collection</p>
           <div className="playlist-detail-actions">
             <button className="btn btn-primary" onClick={() => playAt(0)} disabled={!selected.tracks.length}><Play size={16} /> Play playlist</button>
@@ -219,19 +220,58 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
         {selected.tracks.length === 0
           ? <div className="playlist-empty-state compact"><Music2 size={28} /><h2>This playlist is empty</h2><p className="muted">Find a song you like and save it here.</p><button className="btn btn-primary btn-small" onClick={onBrowse}><Search size={15} /> Find songs</button></div>
           : <ul ref={trackListRef} className="track-list playlist-track-list">
-            {selected.tracks.map((track, index) => <li className={`track playlist-track${dragIndex === index ? ' is-dragging' : ''}`} key={track.id} style={itemStyle(index)}>
-              <button type="button" className="playlist-track-grip" {...handleProps(index)} onKeyDown={(event) => {
-                if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-                  event.preventDefault()
-                  movePlaylistTrack(index, index + (event.key === 'ArrowUp' ? -1 : 1))
-                }
-              }} aria-label={`Reorder ${track.title}`} title="Drag to reorder"><GripVertical size={18} /></button>
-              <button className={`track-play ${track.id === currentTrackId ? 'is-selected' : ''}`} onClick={() => playAt(index)} aria-label={`Play ${track.title}`} title="Play this song"><Play size={15} fill="currentColor" /></button>
-              <img src={track.thumbnail} alt="" loading="lazy" />
-              <div className="track-text"><strong title={track.title}>{track.title}</strong><small>{track.artist}</small></div>
-              <button className="icon-btn playlist-add-queue" onClick={(event) => onQueueTrack(track, event.currentTarget)} aria-label={`Add ${track.title} to queue`} title="Add to queue"><ListPlus size={16} /></button>
-              <button className="icon-btn" onClick={() => removeTrack(track)} aria-label={`Remove ${track.title}`} title="Remove from playlist"><Trash2 size={16} /></button>
-            </li>)}
+            {selected.tracks.map((track, index) => {
+              const isCurrent = track.id === currentTrackId
+              return <li
+                className={`track playlist-track${isCurrent ? ' active' : ''}${dragIndex === index ? ' is-dragging' : ''}`}
+                key={track.id}
+                style={itemStyle(index)}
+              >
+                <button
+                  type="button"
+                  className="playlist-track-grip"
+                  {...handleProps(index)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+                      event.preventDefault()
+                      movePlaylistTrack(index, index + (event.key === 'ArrowUp' ? -1 : 1))
+                    }
+                  }}
+                  aria-label={`Reorder ${track.title}`}
+                  title="Drag to reorder"
+                ><GripVertical size={18} /></button>
+
+                <button
+                  className={`track-play ${isCurrent ? 'is-selected' : ''}`}
+                  onClick={() => playAt(index)}
+                  aria-label={`Play ${track.title}`}
+                  title="Play this song"
+                ><Play size={15} fill="currentColor" /></button>
+
+                <img
+                  src={track.thumbnail}
+                  alt=""
+                  loading="lazy"
+                  onClick={() => playAt(index)}
+                  style={{ cursor: 'pointer' }}
+                />
+
+                <button className="track-text as-button" onClick={() => playAt(index)} aria-label={`Play ${track.title}`}>
+                  <strong title={track.title}>{track.title}</strong>
+                  <small>{track.artist}</small>
+                </button>
+
+                <div className="track-actions">
+                  <LikeButton track={track} />
+                  <TrackMenu
+                    track={track}
+                    onQueue={(trigger) => onQueueTrack(track, trigger)}
+                    onRemove={() => removeTrack(track)}
+                    removeLabel="Remove from playlist"
+                  />
+                </div>
+              </li>
+            })}
           </ul>}
       </section>
       <FeedbackModal title="Playlist update failed" message={error} onClose={() => setError('')} />
@@ -273,7 +313,7 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
                 openPlaylist(playlist, true)
                 onPlayTracks(playlist.tracks, 0)
               }} disabled={!playlist.tracks.length}><Play size={14} /> Play</button>
-              {!playlist.isLiked  && <button className="icon-btn" onClick={() => remove(playlist)} aria-label={`Delete ${playlist.name}`} title="Delete playlist"><Trash2 size={15} /></button>}
+              {!playlist.isLiked && <button className="icon-btn" onClick={() => remove(playlist)} aria-label={`Delete ${playlist.name}`} title="Delete playlist"><Trash2 size={15} /></button>}
             </div>
           </article>)}
         </div>}
@@ -281,7 +321,7 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
     {importState && <div className="feedback-overlay">
       <section className="feedback-card" role="alertdialog" aria-modal="true" aria-labelledby="import-title">
         <span className="feedback-icon">
-          {importState.status === 'done' ? <Check size={21} /> : importState.status === 'error' ? <X size={21} /> : <Skeleton className="skeleton-import-icon" />}
+          {importState.status === 'done' ? <Check size={21} /> : importState.status === 'error' ? <X size={21} /> : <Spinner size={22} thickness={2.5} />}
         </span>
         <h2 id="import-title">
           {importState.status === 'done' ? 'Playlist imported' : importState.status === 'error' ? 'Import failed' : `Importing “${importState.name}”`}

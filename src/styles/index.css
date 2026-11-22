@@ -10,6 +10,7 @@
 @import './layout/topbar.css';
 @import './layout/sidenav.css';
 @import './layout/bottom-nav.css';
+@import './layout/mobile.css';
 
 @import './components/logo.css';
 @import './components/buttons.css';
@@ -24,6 +25,7 @@
 @import './components/home-search.css';
 @import './components/skeleton.css';
 @import './components/feedback.css';
+@import './components/feed-tabs.css';
 
 @import './pages/home.css';
 @import './pages/room.css';
@@ -34,8 +36,8 @@
 @import './pages/quota.css';
 @import './pages/friends.css';
 
-@import './layout/mobile.css';
 
 
+@import './Dark.css';
 @import './Theme.css';
 @import './Polish.css';

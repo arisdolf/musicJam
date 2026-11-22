@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { searchYouTube, getSimilarTracks } from '../services/youtube'
+import { getSimilarTracks } from '../services/youtube'
 import FeedbackModal from './FeedbackModal'
 import { useAccount } from '../features/account/AccountContext'
 import ConfirmModal from './ConfirmModal'
@@ -8,7 +8,8 @@ import InviteFriendsModal from './InviteFriendsModal'
 import { useTopbar } from './TopBarContext'
 import LikeButton from './LikeButton'
 import TrackMenu, { DotsMenu } from './TrackMenu'
-import { PlaylistListSkeleton, TrackSkeletonList } from './Skeleton'
+import { useSongSearch } from '../hooks/useSongSearch'
+import { PlaylistListSkeleton, TrackSkeletonList, Spinner } from './Skeleton'
 import { Play, Search, Music2, Check, X, Plus, Trash2, GripVertical, ListMusic, ListPlus, ChevronDown, LogOut, UserPlus, Sparkles } from 'lucide-react'
 
 export default function MusicRoom({ roomCode, room, updateRoom, connection, members, onLeave, onPlayTrack, onQueueTrack, onPlayTracks, onQueueTracks, onPlayNext }) {
@@ -18,7 +19,6 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
   const [similar, setSimilar] = useState({ seedId: '', tracks: [], loading: false, error: '' })
   const queueIds = room.queue.map((track) => track.id)
   const [query, setQuery] = useState('')
-  const [searchState, setSearchState] = useState({ query: '', results: [], searching: false, error: '' })
   const [copied, setCopied] = useState(false)
   const [saved, setSaved] = useState(false)
   const [saveModalOpen, setSaveModalOpen] = useState(false)
@@ -29,38 +29,28 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
   const [clearOpen, setClearOpen] = useState(false)
   const clearQueue = () => updateRoom((state) => ({ ...state, queue: [], current: 0, playing: false }))
   useTopbar(`Room ${roomCode}`, () => setLeaveOpen(true))
-  const normalizedQuery = query.trim()
-  const searchHasResult = searchState.query === normalizedQuery
-  const results = searchHasResult ? searchState.results : []
-  const searching = Boolean(normalizedQuery && (!searchHasResult || searchState.searching))
-  const searchError = searchHasResult ? searchState.error : ''
+  
+  
+ 
+const search = useSongSearch(query)
+const searchEnd = useRef(null)
+const searchBox = useRef(null)
   const [inviteOpen, setInviteOpen] = useState(false)
   const autoAdded = useRef(new Set())                 // songs we already auto-queued suggestions for
   const latest = useRef({ queue: room.queue, onQueueTracks })
   useEffect(() => { latest.current = { queue: room.queue, onQueueTracks } })
+  
   useEffect(() => {
-    if (!normalizedQuery) return undefined
-    const controller = new AbortController()
-    const timer = setTimeout(async () => {
-      setSearchState({ query: normalizedQuery, results: [], searching: true, error: '' })
-      try {
-        const tracks = await searchYouTube(normalizedQuery, controller.signal)
-        if (!controller.signal.aborted) {
-          setSearchState({
-            query: normalizedQuery,
-            results: tracks,
-            searching: false,
-            error: tracks.length ? '' : 'No songs found. Try another search.',
-          })
-        }
-      } catch (error) {
-        if (error.name !== 'AbortError' && !controller.signal.aborted) {
-          setSearchState({ query: normalizedQuery, results: [], searching: false, error: error.message || 'Song search failed.' })
-        }
-      }
-    }, 300)
-    return () => { clearTimeout(timer); controller.abort() }
-  }, [normalizedQuery])
+    const root = searchBox.current
+    const node = searchEnd.current
+    if (!root || !node || !search.hasMore) return undefined
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) search.loadMore() },
+      { root, rootMargin: '0px 0px 160px 0px' },
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [search.hasMore, search.loadMore, search.tracks.length])
 
   useEffect(() => {
     const only = room.queue.length === 1 ? room.queue[0] : null
@@ -163,11 +153,12 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
         <h2><Sparkles size={17} /> Similar vibes</h2>
         {similar.tracks.length > 0 && <button className="btn btn-small" onClick={() => onQueueTracks(similar.tracks)}><ListPlus size={14} /> Add all</button>}
       </div>
-      <div className="results similar-results">
-        {similar.loading ? <TrackSkeletonList count={3} actions={4} className="search-skeleton" />
-          : similar.error ? <p className="message">{similar.error}</p>
-            : similar.tracks.map((track) => <SongRow key={track.id} track={track} queued={queueIds.includes(track.id)} onPlayTrack={onPlayTrack} onPlayNext={onPlayNext} onQueueTrack={onQueueTrack} />)}
-      </div>
+      {query && <div className="results room-search-results" ref={searchBox}>
+  {search.waiting && !search.tracks.length ? <TrackSkeletonList count={3} actions={2} className="search-skeleton" />
+    : search.error && !search.tracks.length ? <p className="message">{search.error}</p>
+      : search.tracks.map((track) => <SongRow key={track.id} track={track} queued={queueIds.includes(track.id)} onPlayTrack={onPlayTrack} onPlayNext={onPlayNext} onQueueTrack={onQueueTrack} />)}
+  {search.hasMore && <div ref={searchEnd} className="hs-more">{search.loadingMore && <Spinner size={20} label="Loading more songs" />}</div>}
+</div>}
     </section>}
     <section className="block">
       <button className="block-toggle" onClick={() => setPlaylistsOpen((open) => !open)} aria-expanded={playlistsOpen}>
@@ -296,12 +287,18 @@ function RoomPlaylists({ onPlayTracks, onQueueTracks, onPlayTrack, onQueueTrack 
 function SongRow({ track, queued, onPlayTrack, onPlayNext, onQueueTrack }) {
   return <div className="track">
     <img src={track.thumbnail} alt="" loading="lazy" decoding="async" />
-    <div className="track-text"><strong>{track.title}</strong><small>{track.artist}</small></div>
+    <button className="track-text as-button" onClick={() => onPlayTrack(track)} aria-label={`Play ${track.title}`}>
+      <strong>{track.title}</strong><small>{track.artist}</small>
+    </button>
     <div className="track-actions">
       <LikeButton track={track} />
-      <button className="icon-btn" onClick={() => onPlayTrack(track)} aria-label={`Play ${track.title}`} title="Play now"><Play size={16} fill="currentColor" /></button>
-      <button className="icon-btn add-btn" disabled={queued} onClick={(event) => onQueueTrack(track, event.currentTarget)} aria-label={`Add ${track.title} to queue`} title={queued ? 'In queue' : 'Add to queue'}>{queued ? <Check size={16} /> : <Plus size={17} />}</button>
-      <TrackMenu track={track} onPlayNext={() => onPlayNext(track)} />
+      <TrackMenu
+        track={track}
+        onPlay={() => onPlayTrack(track)}
+        onQueue={(trigger) => onQueueTrack(track, trigger)}
+        queued={queued}
+        onPlayNext={() => onPlayNext(track)}
+      />
     </div>
   </div>
 }

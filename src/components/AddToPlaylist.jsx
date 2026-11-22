@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, Heart, LogIn, Plus, UserPlus } from 'lucide-react'
-import { PlaylistListSkeleton, Skeleton } from './Skeleton'
+import { PlaylistListSkeleton, Spinner } from './Skeleton'
 import { useAccount } from '../features/account/AccountContext'
 import { rubberBandAtBounds } from '../utils/motion'
 
@@ -190,7 +190,7 @@ export default function AddToPlaylist({ track, hideButton = false, open: openPro
             data-autofocus={emptyLibrary ? '' : undefined}
           />
           <button className="btn btn-small btn-primary" type="submit" disabled={!name.trim() || creating}>
-            {creating ? <Skeleton className="skeleton-button" /> : <Plus size={14} />} {creating ? 'Creating…' : 'Create'}
+            {creating ? <Spinner size={14} /> : <Plus size={14} />} {creating ? 'Creating…' : 'Create'}
           </button>
         </form>}
       </>}

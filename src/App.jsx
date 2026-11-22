@@ -17,7 +17,7 @@ import PersistentPlayer from './components/PersistentPlayer'
 import QueueFly from './components/QueueFly'
 import { useAccount } from './features/account/AccountContext'
 import ErrorBoundary from './components/ErrorBoundary'
-
+import { recordPlay } from './utils/taste'
 const JoinRoom = lazy(() => import('./components/JoinRoom'))
 const MusicRoom = lazy(() => import('./components/MusicRoom'))
 const Playlists = lazy(() => import('./pages/Playlists'))
@@ -102,6 +102,18 @@ function Shell() {
   const roomPlaybackActive = Boolean(roomCode && roomQueue.length)
   const playbackState = roomPlaybackActive ? room : localPlaybackState
 
+    // A song counts toward "For you" after 15 seconds of playing, so skipped songs don't.
+  const currentTrack = playbackState.queue[playbackState.current] || null
+  const currentTrackId = currentTrack?.id
+  const isPlaying = playbackState.playing
+  const trackRef = useRef(null)
+  useEffect(() => { trackRef.current = currentTrack })
+  useEffect(() => {
+    if (!currentTrackId || !isPlaying) return undefined
+    const timer = setTimeout(() => recordPlay(trackRef.current), 15000)
+    return () => clearTimeout(timer)
+  }, [currentTrackId, isPlaying])
+  
   // The player only follows the room's clock while a room is driving playback.
   const sync = useMemo(() => roomPlaybackActive ? { now: serverNow } : null, [roomPlaybackActive, serverNow])
 

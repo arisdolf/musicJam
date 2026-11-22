@@ -1,0 +1,11 @@
+/* Genre tabs under the top bar. */
+.feed-tabs { position: sticky; top: calc(var(--topbar-h) + env(safe-area-inset-top, 0px)); z-index: 15; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(14px); transition: transform 260ms var(--ease-in-out), opacity 200ms var(--ease-out); }
+.feed-tabs.is-hidden { transform: translateY(-100%); opacity: 0; pointer-events: none; } /* slides under the top bar */
+.feed-tabs-list { width: min(100%, 640px); margin: 0 auto; display: flex; gap: 8px; padding: 10px 16px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+.feed-tabs-list::-webkit-scrollbar { display: none; }
+.feed-tab { flex: none; height: 34px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.feed-tab:hover:not(.active) { color: var(--ink); background: var(--hover, var(--surface)); }
+.feed-tab.active { background: var(--accent); border-color: transparent; color: #fff; }
+@media (max-width: 480px) { .feed-tabs-list { padding: 10px 12px; } }
+@media (hover: none) { .feed-tab:hover:not(.active) { color: var(--muted); background: var(--surface); } }
+@media (prefers-reduced-motion: reduce) { .feed-tabs { transition: opacity 120ms; } }

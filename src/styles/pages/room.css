@@ -30,3 +30,5 @@
 .dropdown-panel { margin-top: 8px; max-height: 340px; overflow-y: auto; overscroll-behavior: contain; animation: enter 260ms var(--ease-out) backwards; }
 
 .similar-results { max-height: 420px; overflow-y: auto; overscroll-behavior: contain; }
+
+.room-search-results { max-height: min(60dvh, 460px); overflow-y: auto; overscroll-behavior: contain; }
