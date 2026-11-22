@@ -21,6 +21,9 @@ function makeSilentWav(seconds = 1, rate = 8000) {
   const samples = seconds * rate
   const buffer = new ArrayBuffer(44 + samples)
   const view = new DataView(buffer)
+  // was: new Uint8Array(buffer, 44).fill(128)
+const data = new Uint8Array(buffer, 44)
+for (let i = 0; i < data.length; i++) data[i] = i % 2 ? 129 : 127 // inaudible, but not digital silence
   const write = (offset, text) => { for (let i = 0; i < text.length; i++) view.setUint8(offset + i, text.charCodeAt(i)) }
   write(0, 'RIFF'); view.setUint32(4, 36 + samples, true); write(8, 'WAVE')
   write(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true)
@@ -87,8 +90,9 @@ export default function PersistentPlayer({ playback, onPlaybackChange, onNavigat
   const [ytState, setYtState] = useState(-1)
   const ytStateTimer = useRef(0)
   const [playlistOpen, setPlaylistOpen] = useState(false)
-const moreRef = useRef(null)
+  const moreRef = useRef(null)
   const userPauseRef = useRef(0) // when the listener last paused on purpose
+  const keepAliveRef = useRef(null)
   const [playerReady, setPlayerReady] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [view, setView] = useState('player')        // 'player' | 'queue' | 'search'
@@ -506,6 +510,7 @@ const moreRef = useRef(null)
 
   // If the browser blocked autoplay, the first click should actually start the video.
   const togglePlay = () => {
+    keepAliveRef.current?.play().catch(() => { })
     const state = playerRef.current?.getPlayerState?.()
     if (playbackPlaying && (state === -1 || state === 5) && currentTrack) {
       requestVideo(currentTrack, true)
@@ -634,6 +639,7 @@ const moreRef = useRef(null)
   useEffect(() => {
     const session = navigator.audioSession
     if (!session?.addEventListener) return undefined
+
     const onStateChange = () => {
       if (session.state === 'interrupted' && callbacksRef.current.playback.playing) changePlaying(false)
     }
@@ -683,6 +689,11 @@ const moreRef = useRef(null)
               latest.onPlaybackChange((state) => ({ ...state, playing: true }), { position: livePosition() })
             }
             if (event.data === 2 && latest.playback.playing && hasPlayedRef.current) {
+              // Paused while the page is hidden and the listener didn't press pause: the phone did it. Resume.
+              if (document.visibilityState === 'hidden' && Date.now() - userPauseRef.current > 2000) {
+                try { event.target.playVideo() } catch { /* player not ready */ }
+                return
+              }
               latest.onPlaybackChange((state) => ({ ...state, playing: false }), { position: livePosition() })
             }
             if (event.data === 0) {
@@ -808,6 +819,50 @@ const moreRef = useRef(null)
     followRoom(player, currentTrackId)
   }, [sync, playerReady, currentTrackId, syncStamp, playbackPlaying, followRoom])
 
+  // Silent looping audio: keeps the phone treating the page as "playing media".
+useEffect(() => {
+  const url = makeSilentWav()
+  const audio = new Audio(url)
+  audio.loop = true
+  audio.setAttribute('playsinline', '')
+  keepAliveRef.current = audio
+  return () => {
+    audio.pause(); audio.removeAttribute('src'); audio.load()
+    URL.revokeObjectURL(url)
+    keepAliveRef.current = null
+  }
+}, [])
+
+useEffect(() => {
+  const audio = keepAliveRef.current
+  if (!audio) return
+  if (playbackPlaying && currentTrackId) audio.play().catch(() => { /* needs a tap first */ })
+  else audio.pause()
+}, [playbackPlaying, currentTrackId])
+
+// While hidden, nudge the player back to playing if the phone paused it.
+useEffect(() => {
+  if (!playerReady || !playbackPlaying || !currentTrackId) return undefined
+  const timer = setInterval(() => {
+    if (document.visibilityState !== 'hidden') return
+    if (Date.now() - userPauseRef.current < 2000) return
+    const player = playerRef.current
+    const state = player?.getPlayerState?.()
+    if (state === 2 || state === 5 || state === -1) { try { player.playVideo() } catch { /* not ready */ } }
+  }, 3000)
+  return () => clearInterval(timer)
+}, [playerReady, playbackPlaying, currentTrackId])
+
+// Coming back to the page: restart if it stopped while you were away.
+useEffect(() => {
+  const onVisible = () => {
+    if (document.visibilityState !== 'visible' || !playbackPlaying || !currentTrack) return
+    const state = playerRef.current?.getPlayerState?.()
+    if (state !== 1 && state !== 3) requestVideo(currentTrack, true)
+  }
+  document.addEventListener('visibilitychange', onVisible)
+  return () => document.removeEventListener('visibilitychange', onVisible)
+}, [playbackPlaying, currentTrack, requestVideo])
 
 
   // Lock-screen / notification controls show the right play or pause state.
@@ -990,7 +1045,7 @@ const moreRef = useRef(null)
           </button>
           <span className="np-kicker">{view === 'queue' ? 'UP NEXT' : view === 'search' ? 'ADD MUSIC' : 'NOW PLAYING'}</span>
           <button
-          ref={moreRef}
+            ref={moreRef}
             className={`np-icon${menuOpen ? ' is-open' : ''}${sleepEnd ? ' has-timer' : ''}`}
             onClick={() => setMenuOpen((open) => !open)}
             aria-label="More options"

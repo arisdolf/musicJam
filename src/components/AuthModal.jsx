@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useId, useState } from 'react'
 
 import { useAccount } from '../features/account/AccountContext'
+import { useDialog } from '../hooks/useDialog'
 import { X, Music2, LogIn, UserPlus } from 'lucide-react'
 
 // Inline Google icon (no extra dependency needed)
@@ -15,25 +16,30 @@ function GoogleIcon() {
   )
 }
 
+// The dialog mounts only while it is open, so focus is set on open and returned to the
+// Log in / Sign up button on close.
 export default function AuthModal() {
- 
-  const { authMode, openAuth, closeAuth, signUp, logIn, logInWithGoogle } = useAccount()
+  const { authMode } = useAccount()
+  if (!authMode) return null
+  return <AuthDialog authMode={authMode} />
+}
+
+function AuthDialog({ authMode }) {
+  const { openAuth, closeAuth, signUp, logIn, logInWithGoogle } = useAccount()
   const [name, setName]         = useState('')
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError]       = useState('')
+  const [errorState, setErrorState] = useState({ mode: authMode, text: '' })
   const [busy, setBusy]         = useState(false)
+  const errorId = useId()
+  const dialogRef = useDialog({ onClose: closeAuth, closeOnEscape: !busy })
 
-  useEffect(() => { setError('') }, [authMode])
-  useEffect(() => {
-    if (!authMode) return undefined
-    const onKey = (event) => { if (event.key === 'Escape') closeAuth() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [authMode, closeAuth])
-
-  if (!authMode) return null
   const isSignup = authMode === 'signup'
+  // An error belongs to the form it happened in; switching Log in / Sign up clears it.
+  const error = errorState.mode === authMode ? errorState.text : ''
+  const setError = (text) => setErrorState({ mode: authMode, text })
+  // form.dirtyGuard: once someone has typed, a stray click outside must not throw the input away.
+  const dirty = Boolean(name || email || password)
 
   const submit = async (event) => {
     event.preventDefault()
@@ -43,7 +49,7 @@ export default function AuthModal() {
       else await logIn({ email, password })
       setPassword('')
     } catch (err) {
-      // Surface Firebase's human-readable messages.
+      // Surface Firebase's human-readable messages. Input stays.
       setError(friendlyError(err))
     } finally { setBusy(false) }
   }
@@ -56,36 +62,63 @@ export default function AuthModal() {
   }
 
   return (
-    <div className="overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) closeAuth() }}>
-      <form className="modal" onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="auth-title">
-        <button type="button" className="modal-close" onClick={closeAuth} aria-label="Close"><X size={19} /></button>
-        <div className="auth-icon"><Music2 size={20} /></div>
+    <div className="overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !dirty && !busy) closeAuth() }}>
+      <form
+        ref={dialogRef}
+        className="modal"
+        onSubmit={submit}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="auth-title"
+        aria-busy={busy || undefined}
+        tabIndex={-1}
+      >
+        <button type="button" className="modal-close" onClick={closeAuth} aria-label="Close" disabled={busy}><X size={19} /></button>
+        <div className="auth-icon" aria-hidden="true"><Music2 size={20} /></div>
         <h2 id="auth-title">{isSignup ? 'Create your account' : 'Welcome back'}</h2>
         <p className="muted">{isSignup ? 'Save songs into playlists and listen to them any time.' : 'Log in to open your playlists.'}</p>
 
-        {/* Google sign-in */}
         <button type="button" className="btn btn-google btn-block" onClick={handleGoogle} disabled={busy}>
-  <GoogleIcon /> Continue with Google
-</button>
-<div className="divider"><span>or</span></div>
+          <GoogleIcon /> Continue with Google
+        </button>
+        <div className="divider"><span>or</span></div>
+
         {isSignup && <label className="field">Name
-          <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" autoFocus />
+          <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" maxLength={60} required data-autofocus />
         </label>}
         <label className="field">Email
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" autoFocus={!isSignup} />
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+            required
+            aria-invalid={error ? 'true' : undefined}
+            aria-describedby={error ? errorId : undefined}
+            data-autofocus={isSignup ? undefined : ''}
+          />
         </label>
-        <label className="field">Password (at least 6 characters)
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={isSignup ? 'new-password' : 'current-password'} />
+        <label className="field">{isSignup ? 'Password (at least 6 characters)' : 'Password'}
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete={isSignup ? 'new-password' : 'current-password'}
+            minLength={isSignup ? 6 : undefined}
+            required
+            aria-invalid={error ? 'true' : undefined}
+            aria-describedby={error ? errorId : undefined}
+          />
         </label>
 
-        {error && <div className="form-error" role="alert">{error}</div>}
+        {error && <div className="form-error" id={errorId} role="alert">{error}</div>}
 
         <button className="btn btn-primary btn-block" type="submit" disabled={busy}>
           {busy ? 'Please wait…' : <>{isSignup ? <UserPlus size={16} /> : <LogIn size={16} />}{isSignup ? ' Sign up' : ' Log in'}</>}
         </button>
         <p className="modal-switch muted">
           {isSignup ? 'Already have an account?' : 'New here?'}{' '}
-          <button type="button" className="link" onClick={() => openAuth(isSignup ? 'login' : 'signup')}>
+          <button type="button" className="link" onClick={() => openAuth(isSignup ? 'login' : 'signup')} disabled={busy}>
             {isSignup ? 'Log in' : 'Sign up'}
           </button>
         </p>

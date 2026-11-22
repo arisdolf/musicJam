@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Check, Flame, Play, Plus, RotateCw, Trash2} from 'lucide-react'
+import { Flame, Play, RotateCw } from 'lucide-react'
 import LikeButton from '../components/LikeButton'
 import { HomeTrackSkeletonList } from '../components/Skeleton'
 import { getTrending } from '../services/youtube'
 import TrackMenu from '../components/TrackMenu'
-export default function Home({ onPlaySong, onQueueTrack, onPlayTracks }) {
+
+export default function Home({ onQueueTrack, onPlayTracks }) {
   const [state, setState] = useState({ loading: true, tracks: [], error: '' })
   const [attempt, setAttempt] = useState(0)
   const [queuedIds, setQueuedIds] = useState([])
@@ -48,24 +49,22 @@ export default function Home({ onPlaySong, onQueueTrack, onPlayTracks }) {
     </div>}
 
     {tracks.length > 0 && <ul className="track-list popular-track-list">
-      {tracks.map((track, index) => {
-        const queued = queuedIds.includes(track.id)
-        return <li className="track" key={track.id}>
-          <span className="popular-rank">{index + 1}</span>
-          <img src={track.thumbnail} alt="" loading="lazy" />
-          <button className="track-text as-button" onClick={() => onPlayTracks(tracks, index)}>
-            <strong title={track.title}>{track.title}</strong><small>{track.artist}</small>
-          </button>
-          <div className="track-actions">
-            <LikeButton track={track} />
-            <button className="icon-btn" onClick={() => onPlayTracks(tracks, index)} aria-label={`Play ${track.title}`} title="Play now"><Play size={16} fill="currentColor" /></button>
-            <button className="icon-btn add-btn" disabled={queued} onClick={(event) => queue(track, event.currentTarget)} aria-label={`Add ${track.title} to queue`} title={queued ? 'In queue' : 'Add to queue'}>
-              {queued ? <Check size={16} /> : <Plus size={17} />}
-            </button>
-            <TrackMenu track={track} />
-          </div>
-        </li>
-      })}
+      {tracks.map((track, index) => <li className="track" key={track.id}>
+        <span className="popular-rank">{index + 1}</span>
+        <img src={track.thumbnail} alt="" loading="lazy" />
+        <button className="track-text as-button" onClick={() => onPlayTracks(tracks, index)} title="Play now">
+          <strong title={track.title}>{track.title}</strong><small>{track.artist}</small>
+        </button>
+        <div className="track-actions">
+          <LikeButton track={track} />
+          <TrackMenu
+            track={track}
+            onPlay={() => onPlayTracks(tracks, index)}
+            onQueue={(trigger) => queue(track, trigger)}
+            queued={queuedIds.includes(track.id)}
+          />
+        </div>
+      </li>)}
     </ul>}
   </main>
 }

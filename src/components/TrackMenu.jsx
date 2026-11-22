@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ListPlus, ListStart, MoreVertical, Trash2 } from 'lucide-react'
+import { Check, ListPlus, ListStart, MoreVertical, Play, Plus, Trash2 } from 'lucide-react'
 import AddToPlaylist from './AddToPlaylist'
 
 // Generic 3-dot menu. items: [{ label, icon, onClick, danger, disabled }]
@@ -63,12 +63,24 @@ export function DotsMenu({ items, label = 'More options', buttonRef, className =
   </>
 }
 
-// Per-song menu for queue rows: add to playlist, play next, remove.
-export default function TrackMenu({ track, onPlayNext, onRemove, playNextDisabled }) {
+// Per-song menu. Every action is optional: pass only the handlers a screen needs.
+//   onPlay    -> "Play now"
+//   onQueue   -> "Add to queue" (receives the 3-dot button so the add animation can start there)
+//   queued    -> shows "In queue" and disables the item
+//   onPlayNext, onRemove -> as before (queue rows)
+export default function TrackMenu({ track, onPlay, onQueue, queued = false, onPlayNext, onRemove, playNextDisabled }) {
   const buttonRef = useRef(null)
   const [playlistOpen, setPlaylistOpen] = useState(false)
 
-  const items = [{ label: 'Add to playlist', icon: <ListPlus size={16} />, onClick: () => setPlaylistOpen(true) }]
+  const items = []
+  if (onPlay) items.push({ label: 'Play now', icon: <Play size={16} />, onClick: onPlay })
+  if (onQueue) items.push({
+    label: queued ? 'In queue' : 'Add to queue',
+    icon: queued ? <Check size={16} /> : <Plus size={16} />,
+    onClick: () => onQueue(buttonRef.current),
+    disabled: queued,
+  })
+  items.push({ label: 'Add to playlist', icon: <ListPlus size={16} />, onClick: () => setPlaylistOpen(true) })
   if (onPlayNext) items.push({ label: 'Play next', icon: <ListStart size={16} />, onClick: onPlayNext, disabled: playNextDisabled })
   if (onRemove) items.push({ label: 'Remove from queue', icon: <Trash2 size={16} />, onClick: onRemove, danger: true })
 
