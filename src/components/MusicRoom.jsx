@@ -153,6 +153,13 @@ const searchBox = useRef(null)
         <h2><Sparkles size={17} /> Similar vibes</h2>
         {similar.tracks.length > 0 && <button className="btn btn-small" onClick={() => onQueueTracks(similar.tracks)}><ListPlus size={14} /> Add all</button>}
       </div>
+      {similar.loading
+        ? <TrackSkeletonList count={3} actions={2} />
+        : similar.error
+          ? <p className="message">{similar.error}</p>
+          : <div className="results similar-results">
+            {similar.tracks.map((track) => <SongRow key={track.id} track={track} queued={queueIds.includes(track.id)} onPlayTrack={onPlayTrack} onPlayNext={onPlayNext} onQueueTrack={onQueueTrack} />)}
+          </div>}
       {query && <div className="results room-search-results" ref={searchBox}>
   {search.waiting && !search.tracks.length ? <TrackSkeletonList count={3} actions={2} className="search-skeleton" />
     : search.error && !search.tracks.length ? <p className="message">{search.error}</p>

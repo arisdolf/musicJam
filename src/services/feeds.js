@@ -90,5 +90,9 @@ export async function getForYou(signal) {
     return tidy(interleave(lists), { limit: 40 })
   })
 
-  return tidy(list, { limit: 30, skip: new Set(taste.recentIds) })
+  const playedIds = new Set(taste.playedIds)
+  const playedKeys = new Set(taste.playedKeys)
+  return tidy(list.filter((track) =>
+    !playedIds.has(track.id) && !playedKeys.has(`${norm(track.title)}|${norm(track.artist)}`),
+  ), { limit: 30 })
 }

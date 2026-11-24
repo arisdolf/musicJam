@@ -1,4 +1,5 @@
 import { cleanTrackInfo } from '../utils/cleanTrack'
+import { getTaste } from '../utils/taste'
 import { findLyricsForTrack } from './lyrics'
 const API_BASE = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '')
 const REGION = 'PH'
@@ -84,23 +85,42 @@ export function searchYouTube(query, signal) {
 
 // ── Song vs. random video ─────────────────────────────────────────────────────
 // Hard no: anything that is not just the song.
-const NOT_A_SONG = /\b(reaction|reacts?|reacting|review|tutorial|how to|lesson|karaoke|vlog|interview|behind the scenes|making of|trailer|teaser|podcast|compilation|full album|shorts|dance practice|choreography|1 hour|2 hours|10 hours|nightcore|8d|asmr|cover|live|concert|performance|session|remix|slowed|sped up|reverb|mashup|medley|instrumental|acoustic|unplugged|fan ?made|skit|intro|outro|short film|film|episode|ep\.?\s?\d+|bts|teaser|snippet|preview|clip|dance version|piano version|tribute|loop|bass boosted|lyric prank)\b/i
+const NOT_A_SONG = /\b(reaction|reacts?|reacting|review|tutorial|how to|lesson|karaoke|vlog|interview|behind the scenes|making of|trailer|teaser|podcast|compilation|full album|shorts|dance practice|choreography|1 hour|2 hours|10 hours|nightcore|8d|asmr|cover|live|concert|performance|session|remix|slowed|sped up|reverb|mashup|medley|instrumental|acoustic|unplugged|fan ?made|skit|intro|outro|short film|film|episode|ep\.?\s?\d+|bts|teaser|snippet|preview|clip|dance version|piano version|tribute|loop|bass boosted|lyric prank|ringtone|jingle|sfx|tiktok|whatsapp status|status video)\b/i
+
+const ALLOWED_LANGS = new Set(['', 'en', 'tl', 'fil', 'ceb', 'und', 'zxx'])
+const WANTS_FOREIGN = /k-?pop|korean|j-?pop|japanese|anime|chinese|c-?pop|mandarin|thai|hindi|bollywood|spanish|latin|reggaeton|arabic/i
+
+// Foreign = non-Latin script, or YouTube says the audio language isn't English/Filipino.
+function isForeign(track) {
+  return FOREIGN_SCRIPT.test(`${track.title} ${track.artist}`) || !ALLOWED_LANGS.has(track.lang || '')
+}
+// If you searched that artist or song by name, don't hide it just because it's foreign.
+function namedInQuery(track, query) {
+  const q = norm(query)
+  if (q.length < 3) return false
+  const artist = norm(track.artist)
+  const title = norm(track.title)
+  return (artist.length >= 3 && q.includes(artist)) || (title.length >= 4 && q.includes(title))
+}
+
+
 // What we accept: plain audio, lyric videos, or official music videos.
 const IS_AUDIO = /\b(official audio|audio|lyrics?|lyric video|lyrical|visuali[sz]er)\b/i
 const IS_MV = /\b(official (music )?video|music video|m\/?v)\b/i
 
 // Returns null when the item should be dropped, otherwise a score (higher = plainer audio).
-function audioScore(item, seconds) {
+function audioScore(item, seconds, { allowMv = true } = {}) {
+  
   const title = item.snippet?.title || ''
   const channel = item.snippet?.channelTitle || ''
   const isTopic = /\s-\s*topic$/i.test(channel)
   const isVevo = /vevo$/i.test(channel)
+  const audio = IS_AUDIO.test(title)
+  const mv = IS_MV.test(title)
 
   if (NOT_A_SONG.test(title)) return null
   if (seconds < MIN_SONG_SECONDS || seconds > MAX_SONG_SECONDS) return null
-
-  const audio = IS_AUDIO.test(title)
-  const mv = IS_MV.test(title)
+  if (!allowMv && !isTopic && !audio) return null // plain music videos carry intros, skits and noise
   // Must be clearly one of the 3 accepted kinds.
   if (!isTopic && !audio && !mv && !isVevo) return null
 
@@ -139,12 +159,14 @@ export function searchMusic(query, { signal, limit, order, extra = {} }) {
     }, signal)
     const byId = new Map((details.items || []).map((item) => [item.id, item]))
 
+      const wantsForeign = WANTS_FOREIGN.test(query)
     const scored = []
     ids.forEach((id, index) => {
       const item = byId.get(id)
       if (!item || !isPlayable(item, REGION)) return
       const track = toTrack(item)
-      const score = audioScore(item, track.duration)
+      if (!wantsForeign && isForeign(track) && !namedInQuery(track, query)) return
+      const score = audioScore(item, track.duration, { allowMv: false })
       if (score === null) return
       if (!isPopular(track)) return
       scored.push({ track, score, index })
@@ -245,6 +267,7 @@ function toTrack(item) {
     artist: info.artist,
     rawTitle: snippet.title,
     channel: snippet.channelTitle,
+        lang: String(snippet.defaultAudioLanguage || snippet.defaultLanguage || '').toLowerCase().split('-')[0],
     thumbnail: snippet.thumbnails?.medium?.url || `https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`,
     duration: parseDuration(contentDetails?.duration),
     views: Number(statistics?.viewCount || 0),
@@ -382,7 +405,7 @@ function phChart(signal) {
 }
 
 export function getSimilarTracks(seed, signal) {
-  return cached(`similar4|${seed.id}`, async () => {
+  return cached(`similar5|${seed.id}`, async () => {
     let text = `${seed.title} ${seed.artist}`
     try {
       const data = await yt('videos', { part: 'snippet', id: seed.id }, signal)
@@ -413,7 +436,8 @@ export function getSimilarTracks(seed, signal) {
     const good = (track, strictness) =>
   isPopular(track, strictness)
   && !BAD_VERSION.test(track.title)
-  && (allowForeign || !FOREIGN_SCRIPT.test(`${track.title} ${track.artist}`))
+  
+   && (allowForeign || !isForeign(track))
   && (isOfficialSource(track) || (sameArtist(track) && !SPAM_CHANNEL.test(track.channel || '')))
     const push = (track) => {
       if (seen.has(track.id) || seen.has(titleKey(track.title))) return false
@@ -421,20 +445,20 @@ export function getSimilarTracks(seed, signal) {
       return true
     }
 
-    // Pass 1 wants very popular songs. Pass 2 relaxes only if we are short of 12.
+    // Pass 1 wants very popular songs. Pass 2 relaxes only if we are short of 24.
     for (const strictness of [2, 1]) {
-      if (out.length >= 12) break
+      if (out.length >= 24) break
       // [source, max songs from it]; the vibe source appears twice so it fills the most slots.
      const sources = [
-  { list: byViews(byArtist).filter((t) => sameArtist(t) && good(t, strictness)), cap: 8, taken: 0 },
+  { list: byViews(byArtist).filter((t) => sameArtist(t) && good(t, strictness)), cap: 2, taken: 0 },
   { list: byViews(chart).filter((t) => good(t, strictness)), cap: 10, taken: 0 },
   { list: byViews(byVibe).filter((t) => good(t, strictness)), cap: 7, taken: 0 },
 ]
       let progress = true
-      while (out.length < 25 && progress) {
+      while (out.length < 50 && progress) {
         progress = false
         for (const source of sources) {
-          if (out.length >= 25 || source.taken >= source.cap) continue
+          if (out.length >= 50 || source.taken >= source.cap) continue
           while (source.list.length) {
             const track = source.list.shift()
             if (push(track)) { source.taken++; progress = true; break }
@@ -443,6 +467,13 @@ export function getSimilarTracks(seed, signal) {
       }
     }
     return out
+  }).then((tracks) => {
+    const taste = getTaste()
+    const heardIds = new Set(taste.playedIds)
+    const heardKeys = new Set(taste.playedKeys)
+    return tracks
+      .filter((track) => !heardIds.has(track.id) && !heardKeys.has(`${titleKey(track.title)}|${norm(track.artist)}`))
+      .slice(0, 12)
   })
 }
 
@@ -467,16 +498,23 @@ export function searchSongsPage(query, pageToken, signal) {
     }, signal)
     const byId = new Map((details.items || []).map((item) => [item.id, item]))
 
-    const tracks = []
-    for (const id of ids) {
+        const wantsForeign = WANTS_FOREIGN.test(query)
+    const scored = []
+    ids.forEach((id, index) => {
       const item = byId.get(id)
-      if (!item || !isPlayable(item, REGION)) continue          // must be music (category 10) and playable
-      if (NOT_A_SONG.test(item.snippet?.title || '')) continue  // reactions, tutorials, shorts, etc.
+      if (!item || !isPlayable(item, REGION)) return
       const track = toTrack(item)
-      if (track.duration < MIN_SONG_SECONDS || track.duration > MAX_SONG_SECONDS) continue
-      tracks.push(track)
-    }
-    return { tracks, nextPageToken }
+      if (!wantsForeign && isForeign(track) && !namedInQuery(track, query)) return
+      const score = audioScore(item, track.duration) // also rejects non-songs and bad lengths
+      if (score === null) return
+      scored.push({ track, score, index })
+    })
+    // Prefer Topic / official audio / lyric videos (score 4+). Plain music videos only fill in
+    // when there are too few clean results, so rare songs still show up.
+    const clean = scored.filter((entry) => entry.score >= 4)
+    const pool = clean.length >= 5 ? clean : scored
+    pool.sort((a, b) => b.score - a.score || a.index - b.index)
+    return { tracks: pool.map((entry) => entry.track), nextPageToken }
   })
 }
 

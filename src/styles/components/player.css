@@ -16,7 +16,7 @@
 
 /* ── Full card ── */
 .np-overlay { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 12px; background: rgba(4,8,10,.6); backdrop-filter: blur(10px); animation: fade-in 220ms var(--ease-out) backwards; }
-.np-card { position: relative; width: min(100%, 400px); height: min(calc(100dvh - 24px), 780px); display: flex; flex-direction: column; overflow: hidden; border-radius: 28px; background: #11171a; color: #fff; box-shadow: 0 30px 90px rgba(0,0,0,.45); animation: sheet-in 420ms var(--ease-out) backwards; }
+.np-card { position: relative; width: min(100%, 400px); height: min(calc(100dvh - 24px), 780px); display: flex; flex-direction: column; overflow: hidden; border-radius: 28px; background: var(--player-bg); color: var(--player-ink); box-shadow: 0 30px 90px rgba(0,0,0,.45); animation: sheet-in 420ms var(--ease-out) backwards; }
 .np-card > * { position: relative; }
 .np-card > .np-backdrop { position: absolute; inset: -30px; background-size: cover; background-position: center; filter: blur(38px) saturate(1.4); opacity: .5; }
 @keyframes np-overlay-out { to { opacity: 0; } }
@@ -73,20 +73,20 @@
 .np-progress { flex: 0 0 auto; }
 .np-seek { --pct: 0%; display: block; width: 100%; height: 20px; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; cursor: pointer; appearance: none; -webkit-appearance: none; }
 .np-seek:focus { box-shadow: none; }
-.np-seek:focus-visible { outline: 2px solid #63dbc5; outline-offset: 4px; }
-.np-seek::-webkit-slider-runnable-track { height: 4px; border-radius: 999px; background: linear-gradient(to right, #63dbc5 var(--pct), rgba(255,255,255,.22) var(--pct)); }
+.np-seek:focus-visible { outline: 2px solid var(--player-accent); outline-offset: 4px; }
+.np-seek::-webkit-slider-runnable-track { height: 4px; border-radius: 999px; background: linear-gradient(to right, var(--player-accent) var(--pct), var(--player-track) var(--pct)); }
 .np-seek::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border: 0; border-radius: 50%; background: #fff; }
-.np-seek::-moz-range-track { height: 4px; border-radius: 999px; background: rgba(255,255,255,.22); }
-.np-seek::-moz-range-progress { height: 4px; border-radius: 999px; background: #63dbc5; }
+.np-seek::-moz-range-track { height: 4px; border-radius: 999px; background: var(--player-track); }
+.np-seek::-moz-range-progress { height: 4px; border-radius: 999px; background: var(--player-accent); }
 .np-seek::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: 50%; background: #fff; }
 .np-times { display: flex; justify-content: space-between; margin-top: 2px; color: rgba(255,255,255,.6); font-size: 11px; font-variant-numeric: tabular-nums; }
 
 /* ── Controls ── */
 .np-controls { display: flex; align-items: center; justify-content: space-between; padding: 8px 20px max(22px, env(safe-area-inset-bottom, 22px)); }
-.np-play { width: 66px; height: 66px; display: grid; place-items: center; border: 0; border-radius: 50%; background: #fff; color: #11171a; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
-.np-play:hover:not(:disabled) { background: #e8f7f4; }
+.np-play { width: 66px; height: 66px; display: grid; place-items: center; border: 0; border-radius: 50%; background: #fff; color: var(--player-bg); box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+.np-play:hover:not(:disabled) { background: var(--player-accent-soft); }
 .np-circle { width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 50%; background: rgba(255,255,255,.16); color: #fff; }
-.np-circle:hover:not(:disabled), .np-circle.active { background: #63dbc5; color: #11171a; }
+.np-circle:hover:not(:disabled), .np-circle.active { background: var(--player-accent); color: var(--player-foreground-on-accent); }
 
 /* ── Options menu (opens above the right-hand button) ── */
 .np-card > .np-menu-scrim { position: absolute; inset: 0; z-index: 2; }
@@ -112,7 +112,7 @@
 .np-search-input { position: relative; flex: 0 0 auto; }
 .np-search input { padding-right: 48px; background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.2); color: #fff; }
 .np-search input::placeholder { color: rgba(255,255,255,.55); }
-.np-search input:focus { border-color: #63dbc5; box-shadow: 0 0 0 3px rgba(99,219,197,.25); }
+.np-search input:focus { border-color: var(--player-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--player-accent) 28%, transparent); }
 .np-search-clear { position: absolute; top: 4px; right: 5px; width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: transparent; color: rgba(255,255,255,.65); }
 .np-search-clear:hover:not(:disabled) { background: rgba(255,255,255,.12); color: #fff; }
 .np-search-clear:disabled { opacity: .3; }
@@ -157,7 +157,7 @@
 .np-stage.slide-from-left  { animation: np-slide-from-left 300ms var(--ease-in-out) backwards; }
 
 .np-icon.has-timer { position: relative; }
-.np-icon.has-timer::after { content: ""; position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border-radius: 50%; background: #e0343f; box-shadow: 0 0 0 2px #11171a; }
+.np-icon.has-timer::after { content: ""; position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--color-destructive); box-shadow: 0 0 0 2px var(--player-bg); }
 
 /* ── Fit: art shrinks to leave room for lyrics + controls ── */
 .np-card { --np-h: min(calc(100dvh - 24px), 780px); }

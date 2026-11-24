@@ -6,7 +6,7 @@ body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--bg); co
 button, input { font: inherit; color: inherit; }
 button { cursor: pointer; }
 button:disabled { opacity: .45; cursor: not-allowed; }
-a { color: inherit; text-decoration: none; }
+a { color: inherit; text-decoration: none; text-underline-offset: .18em; }
 ::selection { background: var(--accent-soft); color: var(--ink); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button svg, h2 svg, .room-meta svg { display: inline-block; vertical-align: -3px; flex: 0 0 auto; }

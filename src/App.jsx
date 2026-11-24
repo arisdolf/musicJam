@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef, useEffect, lazy, Suspense } from 'react'
+import { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect, lazy, Suspense } from 'react'
 import { FriendsProvider } from './features/friends/FriendsContext'
 import { getSimilarTracks } from './services/youtube'
 import InviteToasts from './components/InviteToasts'
@@ -18,11 +18,25 @@ import QueueFly from './components/QueueFly'
 import { useAccount } from './features/account/AccountContext'
 import ErrorBoundary from './components/ErrorBoundary'
 import { recordPlay } from './utils/taste'
-const JoinRoom = lazy(() => import('./components/JoinRoom'))
-const MusicRoom = lazy(() => import('./components/MusicRoom'))
-const Playlists = lazy(() => import('./pages/Playlists'))
-const RecentRooms = lazy(() => import('./pages/RecentRooms'))
-const Settings = lazy(() => import('./pages/Settings'))
+function lazyRoute(importer) {
+  return lazy(async () => {
+    let lastError
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try { return await importer() }
+      catch (error) {
+        lastError = error
+        if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)))
+      }
+    }
+    throw lastError
+  })
+}
+
+const JoinRoom = lazyRoute(() => import('./components/JoinRoom'))
+const MusicRoom = lazyRoute(() => import('./components/MusicRoom'))
+const Playlists = lazyRoute(() => import('./pages/Playlists'))
+const RecentRooms = lazyRoute(() => import('./pages/RecentRooms'))
+const Settings = lazyRoute(() => import('./pages/Settings'))
 
 // ── Inner shell (needs AccountContext) ────────────────────────────────────────
 function Shell() {
@@ -33,6 +47,7 @@ function Shell() {
     playTrack: playLocalTrack,
     addToQueue: addLocalTrack,
     playTracks: playLocalTracks,
+    
     startVideo,
   } = usePlayback()
   const [view, setView] = useState(() => new URLSearchParams(window.location.search).get('room') ? 'create' : 'home')
@@ -40,6 +55,7 @@ function Shell() {
   const [settingsSection, setSettingsSection] = useState(null) // null | 'friends' | 'quota'
   const [queueFly, setQueueFly] = useState(null)
   const queueFlyCounter = useRef(0)
+  const similarRequest = useRef(0) // invalidates an older "similar songs" fetch if you play something else
   const openFriends = useCallback(() => { setSettingsSection('friends'); setView('settings') }, [])
   const { room, updateRoom, connection, members, serverNow } = useRoom(roomCode)
   const roomQueue = room.queue
@@ -99,6 +115,16 @@ function Shell() {
     if (id !== view) setView(id)
   }, [view])
 
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0)
+  }, [view, settingsSection, roomCode])
+
+  useEffect(() => {
+    if (loadingAccount || user || !['playlists', 'settings'].includes(view)) return
+    setSettingsSection(null)
+    setView('home')
+  }, [loadingAccount, user, view])
+
   const roomPlaybackActive = Boolean(roomCode && roomQueue.length)
   const playbackState = roomPlaybackActive ? room : localPlaybackState
 
@@ -141,8 +167,9 @@ function Shell() {
   const completeQueueFly = useCallback((key) => {
     setQueueFly((current) => current?.key === key ? null : current)
   }, [])
-
+ 
   const playTrack = useCallback((track) => {
+     similarRequest.current++
     if (!track?.id) return
     if (!roomCode) { playLocalTrack(track); return }
     updateRoom((state) => playNow(state, [track]))
@@ -183,21 +210,27 @@ function Shell() {
   }, [roomCode, updateRoom, addLocalTrack, animateQueueAdd])
 
   const playTracks = useCallback((tracks, index = 0) => {
+    similarRequest.current++
     if (!roomCode) { playLocalTracks(tracks, index); return }
     if (!tracks[index]?.id) return
     updateRoom((state) => replaceQueue(state, tracks, index))
     startVideo(tracks[index].id)
   }, [roomCode, updateRoom, playLocalTracks, startVideo])
 
-// Plays this song (queued first, existing queue kept), then adds up to 25 similar songs at the end.
+
+// Plays this song on its own (the old queue/playlist is replaced), then adds up to 25 similar songs after it.
 const playWithSimilar = useCallback(async (track) => {
   if (!track?.id) return
-  playTrack(track)
+  playTracks([track], 0)
+  const request = ++similarRequest.current
   try {
     const similar = await getSimilarTracks(track)
+    if (request !== similarRequest.current) return // you already played something else
     queueTracks(similar.slice(0, 25))
   } catch { /* the song is already playing; recommendations are a bonus */ }
-}, [playTrack, queueTracks])
+}, [playTracks, queueTracks])
+
+const homePage = <Home user={user} currentTrack={currentTrack} isPlaying={isPlaying} onOpenJamRoom={() => navigate('create')} onQueueTrack={queueTrack} onPlayTracks={playTracks} />
 
 const renderContent = () => {
   if (roomCode && view === 'create') {
@@ -206,10 +239,10 @@ const renderContent = () => {
 
   switch (view) {
     case 'create': return <JoinRoom onJoin={joinRoom} />
-    case 'playlists': return <Playlists onBrowse={() => navigate('home')} onPlayTracks={playTracks} onQueueTrack={queueTrack} />
+    case 'playlists': return user ? <Playlists onBrowse={() => navigate('home')} onPlayTracks={playTracks} onQueueTrack={queueTrack} /> : homePage
     case 'recent': return <RecentRooms onJoin={joinRoom} />
-    case 'settings': return user ? <Settings roomCode={roomCode} section={settingsSection} onSectionChange={setSettingsSection} /> : null
-    default: return <Home onPlaySong={playWithSimilar} onQueueTrack={queueTrack} onPlayTracks={playTracks} />
+    case 'settings': return user ? <Settings roomCode={roomCode} section={settingsSection} onSectionChange={setSettingsSection} /> : homePage
+    default: return homePage
   }
 }
 

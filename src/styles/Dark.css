@@ -1,50 +1,12 @@
-/* Dark mode refinement. Loaded last. New tokens fall back to the old values in light mode. */
+/* Dark mode refinement. Legacy component names resolve through tokens.css. */
 :root {
-  --field: var(--bg);
-  --card: var(--bg);
-  --hover: var(--surface);
-  --line-strong: var(--line);
-  --rail: var(--bg);
-  --focus: var(--accent);
-  --stage: 1;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: oklch(0.14 0.006 15);
-    --surface: oklch(0.19 0.008 15);
-    --raised: oklch(0.235 0.01 15);
-    --card: oklch(0.17 0.007 15);
-    --field: oklch(0.165 0.007 15);
-    --hover: oklch(0.27 0.012 15);
-    --rail: oklch(0.12 0.006 15);
-    --ink: oklch(0.97 0.004 15);
-    --muted: oklch(0.74 0.012 15);
-    --line: oklch(1 0 0 / 0.08);
-    --line-strong: oklch(1 0 0 / 0.15);
-    --accent-soft: oklch(0.24 0.05 17);
-    --focus: oklch(0.78 0.13 20);
-    --scrim: oklch(0 0 0 / 0.7);
-    --shadow-pop: 0 0 0 1px oklch(1 0 0 / .05), 0 18px 48px oklch(0 0 0 / .6);
-    --stage: .55;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: oklch(0.14 0.006 15);
-  --surface: oklch(0.19 0.008 15);
-  --raised: oklch(0.235 0.01 15);
-  --card: oklch(0.17 0.007 15);
-  --field: oklch(0.165 0.007 15);
-  --hover: oklch(0.27 0.012 15);
-  --rail: oklch(0.12 0.006 15);
-  --ink: oklch(0.97 0.004 15);
-  --muted: oklch(0.74 0.012 15);
-  --line: oklch(1 0 0 / 0.08);
-  --line-strong: oklch(1 0 0 / 0.15);
-  --accent-soft: oklch(0.24 0.05 17);
-  --focus: oklch(0.78 0.13 20);
-  --scrim: oklch(0 0 0 / 0.7);
-  --shadow-pop: 0 0 0 1px oklch(1 0 0 / .05), 0 18px 48px oklch(0 0 0 / .6);
-  --stage: .55;
+  --field: var(--color-field);
+  --card: var(--color-card);
+  --hover: var(--color-hover);
+  --line-strong: var(--color-border-strong);
+  --rail: var(--color-rail);
+  --focus: var(--color-focus);
+  --stage: var(--color-stage);
 }
 
 /* ── Rules (use tokens, so they only change dark mode) ── */

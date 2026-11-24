@@ -2,74 +2,41 @@
    Applies tips from "10 Niche Design Hacks" and "20 Principles of UX & Animation".
    Each section says which tip it is. */
 
-/* ── 3 + 2 + 8. OKLCH palette, alpha borders, dark-mode depth ──────────────────
-   Same hues as tokens.css, written in OKLCH so lightness is even across colours.
-   --line is now a translucent ink, so borders blend into whatever sits behind them.
-   --raised is the surface for floating things: in dark mode it is LIGHTER than the page. */
+/* ── Shared palette aliases ───────────────────────────────────────────────────
+   tokens.css owns the light and dark palettes; this layer only maps legacy names. */
 :root {
-  --bg: oklch(1 0 0);
-  --surface: oklch(0.967 0.012 11);
-  --ink: oklch(0.18 0.037 13);
-  --muted: oklch(0.484 0.054 9);
-  --line: oklch(0.3 0.06 15 / 0.14);
-  --accent: oklch(0.467 0.18 25);
-  --accent-dark: oklch(0.405 0.156 24);
-  --accent-hover: oklch(0.405 0.156 24);
-  --accent-soft: oklch(0.942 0.023 11);
-  --accent-2: oklch(0.592 0.18 27);
-  --live: oklch(0.42 0.13 154);
-  --live-soft: oklch(0.95 0.04 155);
-  --danger: oklch(0.593 0.193 36);
-  --danger-hover: oklch(0.524 0.173 36);
-  --danger-bg: oklch(0.984 0.009 45);
-  --danger-line: oklch(0.88 0.053 42);
-  --spot: linear-gradient(135deg in oklch, oklch(0.415 0.161 24), oklch(0.522 0.194 24));
-  --raised: var(--bg);
-  --edge-light: transparent;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: oklch(0.145 0.002 286);
-    --surface: oklch(0.196 0.002 286);
-    --ink: oklch(0.976 0 90);
-    --muted: oklch(0.72 0.006 286);
-    --line: oklch(1 0 0 / 0.1);
-    --accent: oklch(0.527 0.195 23);
-    --accent-dark: oklch(0.772 0.135 16);
-    --accent-hover: oklch(0.471 0.174 23);
-    --accent-soft: oklch(0.214 0.043 14);
-    --accent-2: oklch(0.759 0.144 26);
-    --live: oklch(0.8 0.15 155);
-    --live-soft: oklch(0.25 0.05 155);
-    --danger: oklch(0.783 0.136 46);
-    --danger-hover: oklch(0.824 0.106 46);
-    --danger-bg: oklch(0.222 0.037 31);
-    --danger-line: oklch(0.391 0.086 39);
-    --spot: linear-gradient(135deg in oklch, oklch(0.443 0.171 24), oklch(0.56 0.2 24));
-    --raised: oklch(0.232 0.004 286);
-    --edge-light: oklch(1 0 0 / 0.07);
-  }
-}
-:root[data-theme="dark"] {
-  --bg: oklch(0.145 0.002 286);
-  --surface: oklch(0.196 0.002 286);
-  --ink: oklch(0.976 0 90);
-  --muted: oklch(0.72 0.006 286);
-  --line: oklch(1 0 0 / 0.1);
-  --accent: oklch(0.527 0.195 23);
-  --accent-dark: oklch(0.772 0.135 16);
-  --accent-hover: oklch(0.471 0.174 23);
-  --accent-soft: oklch(0.214 0.043 14);
-  --accent-2: oklch(0.759 0.144 26);
-  --live: oklch(0.8 0.15 155);
-  --live-soft: oklch(0.25 0.05 155);
-  --danger: oklch(0.783 0.136 46);
-  --danger-hover: oklch(0.824 0.106 46);
-  --danger-bg: oklch(0.222 0.037 31);
-  --danger-line: oklch(0.391 0.086 39);
-  --spot: linear-gradient(135deg in oklch, oklch(0.443 0.171 24), oklch(0.56 0.2 24));
-  --raised: oklch(0.232 0.004 286);
-  --edge-light: oklch(1 0 0 / 0.07);
+  --bg: var(--color-background);
+  --surface: var(--color-surface);
+  --raised: var(--color-raised);
+  --card: var(--color-card);
+  --field: var(--color-field);
+  --rail: var(--color-rail);
+  --hover: var(--color-hover);
+  --ink: var(--color-foreground);
+  --muted: var(--color-muted-foreground);
+  --line: var(--color-border);
+  --line-strong: var(--color-border-strong);
+  --accent: var(--color-primary);
+  --accent-dark: var(--color-primary-strong);
+  --accent-hover: var(--color-primary-hover);
+  --accent-soft: var(--color-primary-soft);
+  --accent-2: var(--color-accent);
+  --live: var(--color-success);
+  --live-soft: var(--color-success-soft);
+  --warning: var(--color-warning);
+  --warning-soft: var(--color-warning-soft);
+  --danger: var(--color-destructive);
+  --danger-hover: var(--color-destructive-hover);
+  --danger-bg: var(--color-destructive-soft);
+  --danger-line: var(--color-destructive-border);
+  --on-danger: var(--color-destructive-foreground);
+  --scrim: var(--color-scrim);
+  --focus: var(--color-focus);
+  --spot: var(--brand-gradient);
+  --glow: var(--shadow-accent);
+  --shadow-pop: var(--shadow-floating);
+  --stage: var(--color-stage);
+  --edge-light: var(--color-edge-light);
 }
 
 /* 8. Dark mode depth: floating surfaces are lighter than the page and get a faint top highlight,
@@ -89,10 +56,10 @@
   background: linear-gradient(125deg in oklch, color-mix(in oklch, var(--accent) 18%, var(--bg)), var(--bg) 72%);
 }
 .np-seek::-webkit-slider-runnable-track {
-  background: linear-gradient(to right in oklch, oklch(0.56 0.2 24) 0, #fff var(--pct), rgba(255, 255, 255, .22) var(--pct));
+  background: linear-gradient(to right in oklch, var(--player-accent) 0, #fff var(--pct), var(--player-track) var(--pct));
 }
 .np-lyrics-list p.current {
-  background: linear-gradient(90deg in oklch, oklch(0.56 0.2 24 / .28), rgba(255, 255, 255, .1));
+  background: linear-gradient(90deg in oklch, color-mix(in oklch, var(--player-accent) 28%, transparent), rgba(255, 255, 255, .1));
 }
 
 /* 1. Concentric radius: inner radius = outer radius - the padding between them. */
@@ -207,7 +174,7 @@ button, a, input, [role="button"], [role="checkbox"] { touch-action: manipulatio
 .queue-thumb.is-playing::before { content: ""; position: absolute; inset: 0; background: rgba(0, 0, 0, .5); }
 .queue-track.active::after { content: none; } /* old equalizer that pushed the row wide */
 .eq-bars { position: absolute; inset: 0; margin: auto; width: 16px; height: 14px; display: flex; align-items: flex-end; gap: 2px; background: none; animation: none; }
-.eq-bars i { flex: 1; height: 100%; border-radius: 1px; background: #ff3b4a; transform-origin: bottom; animation: eq-bounce .9s ease-in-out infinite; }
+.eq-bars i { flex: 1; height: 100%; border-radius: 1px; background: var(--player-accent); transform-origin: bottom; animation: eq-bounce .9s ease-in-out infinite; }
 .eq-bars i:nth-child(2) { animation-duration: .7s; animation-delay: -.3s; }
 .eq-bars i:nth-child(3) { animation-duration: 1.1s; animation-delay: -.6s; }
 .eq-bars.paused i { animation-play-state: paused; }
@@ -248,8 +215,11 @@ button, a, input, [role="button"], [role="checkbox"] { touch-action: manipulatio
   .np-card .icon-btn:hover:not(:disabled):not(.active) { background: none; color: rgba(255,255,255,.8); }
   .np-icon:hover:not(:disabled) { background: none; color: rgba(255,255,255,.88); }
   .np-circle:hover:not(:disabled):not(.active) { background: rgba(255,255,255,.16); color: #fff; }
-  .np-play:hover:not(:disabled) { background: #fff; filter: none; transform: none; }
-  .mini-play:hover:not(:disabled) { background: var(--accent); filter: none; transform: none; }
+  /* Tap flash: white while pressed, back to the normal colour on release */
+.np-play, .mini-play { transition: color 120ms var(--ease-out), transform 200ms var(--spring); }
+.np-play:active:not(:disabled) { background: #fff; color: var(--player-press-ink); }
+.mini-play:active:not(:disabled) { background: #fff; color: var(--player-press-ink); box-shadow: inset 0 0 0 2px var(--accent); }
+.btn-primary:active:not(:disabled) { background: #fff; color: var(--player-press-ink); border-color: var(--accent); }
   .modal-close:hover:not(:disabled), .dots-item:hover:not(:disabled), .popover-item:hover:not(:disabled),
   .np-menu button:hover { background: none; }
   .sidenav-item:hover:not(.active) { background: none; color: var(--muted); }

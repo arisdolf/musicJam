@@ -265,24 +265,24 @@ input:focus {
 
 .np-art {
   border-radius: 28px;
-  box-shadow: 0 30px 70px rgba(0, 0, 0, .55), 0 0 60px rgba(214, 40, 55, .28);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, .55), 0 0 60px color-mix(in srgb, var(--player-accent) 28%, transparent);
   animation: art-in 360ms var(--spring) backwards;
 }
 
 .np-lyric-window p.current {
-  text-shadow: 0 0 22px rgba(214, 40, 55, .55);
+  text-shadow: 0 0 22px color-mix(in srgb, var(--player-accent) 55%, transparent);
 }
 
 .np-lyrics-list p.current {
-  background: linear-gradient(90deg, rgba(214, 40, 55, .28), rgba(255, 255, 255, .1));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--player-accent) 28%, transparent), rgba(255, 255, 255, .1));
 }
 
 .np-seek::-webkit-slider-runnable-track {
-  background: linear-gradient(to right, #e0343f 0, #ffffff var(--pct), rgba(255, 255, 255, .22) var(--pct));
+  background: linear-gradient(to right, var(--player-accent) 0, #ffffff var(--pct), var(--player-track) var(--pct));
 }
 
 .np-seek::-moz-range-progress {
-  background: #e0343f;
+  background: var(--player-accent);
 }
 
 .np-seek::-webkit-slider-thumb {
@@ -322,7 +322,7 @@ input:focus {
 .queue-fly {
   border-radius: 50%;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent), 0 6px 22px rgba(214, 40, 55, .5);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--player-accent) 30%, transparent), 0 6px 22px color-mix(in srgb, var(--player-accent) 50%, transparent);
 }
 
 /* ── Playlists ── */
@@ -383,8 +383,8 @@ input:focus {
 }
 
 .np-search input:focus {
-  border-color: #e0343f;
-  box-shadow: 0 0 0 3px rgba(214, 40, 55, .28);
+  border-color: var(--player-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--player-accent) 28%, transparent);
 }
 
 /* ── Keyframes ── */
@@ -507,7 +507,7 @@ input:focus {
 }
 
 .np-switch.is-on {
-  background: #e0343f;
+  background: var(--player-accent);
 }
 
 .np-switch.is-on::after {

@@ -133,25 +133,7 @@ async function lookup(track, signal) {
   const info = parseTrackInfo(track.title, track.artist)
   if (!info.title) return null
 
-  // Exact lookup first: title + artist + length. LRCLIB only answers with a record whose length is within
-  // a couple of seconds of the video, which is the version that actually lines up. Any failure here just
-  // falls through to the broader search below.
-  if (info.artist && track.duration) {
-    try {
-      const exact = await lrclib('/get', {
-        track_name: info.title,
-        artist_name: info.artist,
-        duration: String(Math.round(track.duration)),
-      }, signal)
-      if (exact && !exact.instrumental && parseSyncedLyrics(exact.syncedLyrics).length) {
-        if (exact.id) recordCache.set(exact.id, exact)
-        return exact
-      }
-    } catch (error) {
-      if (error.name === 'AbortError') throw error
-    }
-  }
-
+  // Search returns an empty list for misses; /get returns 404 and pollutes the console.
   const primary = [
     info.artist ? { track_name: info.title, artist_name: info.artist } : { track_name: info.title },
     { q: `${info.artist} ${info.title}`.trim() },

@@ -1,56 +1,230 @@
-/* Design tokens: colour, sizing and motion. Dark mode only swaps colours.
-   Theme: "Red Carpet" — crisp white, deep crimson on black, coral highlights, green = live/ok. */
+/* Design tokens: color, spacing, type, and motion. Dark mode swaps semantic colors. */
 :root {
   color-scheme: light;
-  --bg: #ffffff; --surface: #fcf1f2; --ink: #1f0a0d; --muted: #7a5258; --line: #efd3d6;
-  --accent: #a8111f; --accent-dark: #8a0d19; --accent-hover: #8a0d19; --accent-soft: #fbe6e8;
-  --accent-2: #d4453f;            /* coral highlight */
-  --live: #0d7144; --live-soft: #e5f5eb;
-  --warning: #765b00; --warning-soft: #fbf3d6;
-  --danger: #d84315; --danger-hover: #b8360f; --on-danger: #fff; --danger-bg: #fff8f5; --danger-line: #f7cdbd;
-  --scrim: rgba(10,10,10,.55); --player-bg: #0b0b0c;
-  --spot: linear-gradient(135deg, #8f0c1a, #c01f2b);
-  --glow: 0 8px 26px rgba(168,17,31,.34);
-  --radius: 10px; --topbar-h: 56px; --nav-h: 60px;
+
+  /* Primitive palette */
+  --palette-paper: #f6f1ef;
+  --palette-white: #fffdfc;
+  --palette-ink: #26191f;
+  --palette-muted: #6e5961;
+  --palette-line: #e9d9dc;
+  --palette-berry: #862840;
+  --palette-berry-hover: #742137;
+  --palette-berry-soft: #f4e3e7;
+  --palette-coral: #b95e68;
+  --palette-green: #177457;
+  --palette-green-soft: #e1f1e9;
+  --palette-amber: #78560a;
+  --palette-amber-soft: #fbf1d5;
+  --palette-danger: #b84b34;
+  --palette-danger-soft: #fff3ee;
+  --palette-night: #100d14;
+  --palette-night-surface: #19151e;
+  --palette-night-card: #1d1822;
+  --palette-night-raised: #2a2330;
+  --palette-night-field: #211b26;
+  --palette-night-hover: #302634;
+  --palette-night-ink: #f7f1f4;
+  --palette-night-muted: #c1b3bb;
+  --palette-night-line: rgb(255 255 255 / 10%);
+
+  /* Semantic tokens */
+  --color-background: var(--palette-paper);
+  --color-surface: #fdf8f6;
+  --color-card: var(--palette-white);
+  --color-raised: var(--palette-white);
+  --color-field: #fff;
+  --color-rail: #fcf7f5;
+  --color-hover: #f2e5e7;
+  --color-foreground: var(--palette-ink);
+  --color-muted-foreground: var(--palette-muted);
+  --color-border: var(--palette-line);
+  --color-border-strong: #d9c3c8;
+  --color-primary: var(--palette-berry);
+  --color-primary-hover: var(--palette-berry-hover);
+  --color-primary-strong: #702036;
+  --color-primary-soft: var(--palette-berry-soft);
+  --color-accent: var(--palette-coral);
+  --color-success: var(--palette-green);
+  --color-success-soft: var(--palette-green-soft);
+  --color-warning: var(--palette-amber);
+  --color-warning-soft: var(--palette-amber-soft);
+  --color-destructive: var(--palette-danger);
+  --color-destructive-hover: #983620;
+  --color-destructive-soft: var(--palette-danger-soft);
+  --color-destructive-border: #e4b6a8;
+  --color-destructive-foreground: #fff;
+  --color-scrim: rgb(22 10 16 / 58%);
+  --color-focus: #9d314a;
+  --color-edge-light: transparent;
+  --color-stage: 1;
+  --brand-gradient: linear-gradient(135deg, #7c2037, #ad304c);
+  --shadow-accent: 0 8px 26px rgb(134 40 64 / 22%);
+  --shadow-floating: 0 16px 42px rgb(55 29 39 / 13%);
+
+  /* Legacy names keep existing component styles on the shared semantic system. */
+  --bg: var(--color-background);
+  --surface: var(--color-surface);
+  --raised: var(--color-raised);
+  --card: var(--color-card);
+  --field: var(--color-field);
+  --rail: var(--color-rail);
+  --hover: var(--color-hover);
+  --ink: var(--color-foreground);
+  --muted: var(--color-muted-foreground);
+  --line: var(--color-border);
+  --line-strong: var(--color-border-strong);
+  --accent: var(--color-primary);
+  --accent-dark: var(--color-primary-strong);
+  --accent-hover: var(--color-primary-hover);
+  --accent-soft: var(--color-primary-soft);
+  --accent-2: var(--color-accent);
+  --live: var(--color-success);
+  --live-soft: var(--color-success-soft);
+  --warning: var(--color-warning);
+  --warning-soft: var(--color-warning-soft);
+  --danger: var(--color-destructive);
+  --danger-hover: var(--color-destructive-hover);
+  --danger-bg: var(--color-destructive-soft);
+  --danger-line: var(--color-destructive-border);
+  --on-danger: var(--color-destructive-foreground);
+  --scrim: var(--color-scrim);
+  --focus: var(--color-focus);
+  --spot: var(--brand-gradient);
+  --glow: var(--shadow-accent);
+  --shadow-pop: var(--shadow-floating);
+  --stage: var(--color-stage);
+  --edge-light: var(--color-edge-light);
+
+  /* Banner and player component tokens */
+  --color-banner-start: #642037;
+  --color-banner-end: #170d13;
+  --color-banner-foreground: #fff;
+  --color-banner-muted: #f5d8de;
+  --color-banner-line: rgb(255 255 255 / 15%);
+  --color-record-base: #160d10;
+  --color-record-ridge: #29151b;
+  --player-bg: #0b0910;
+  --player-ink: #fff8fa;
+  --player-muted: rgb(255 248 250 / 66%);
+  --player-accent: #f07b91;
+  --player-accent-soft: #ffe5e9;
+  --player-press-ink: var(--color-primary);
+  --player-foreground-on-accent: #26121a;
+  --player-track: rgb(255 255 255 / 23%);
+  --player-control-bg: rgb(255 255 255 / 16%);
+  --player-menu-bg: rgb(31 23 33 / 97%);
+  --player-overlay: rgb(8 4 10 / 76%);
+
+  /* Component geometry and spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-component: var(--space-4);
+  --space-section: var(--space-8);
+  --radius: 12px;
+  --card-radius: 16px;
+  --cover-radius: 13px;
+  --home-card-width: 164px;
+  --home-card-gap: 16px;
+  --topbar-h: 56px;
+  --nav-h: 60px;
   --bottom-space: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
-  --shadow-pop: 0 14px 40px rgba(100,10,20,.22);
+  --button-primary-background: var(--color-primary);
+  --button-primary-foreground: #fff;
+  --card-background: var(--color-card);
+  --card-foreground: var(--color-foreground);
+
+  /* Typography and motion */
   --font-body: "DM Sans", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-display: "Sora", "DM Sans", Inter, system-ui, sans-serif;
-
-  /* motion */
-  --ease-out: cubic-bezier(.4, 0, .2, 1);
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
   --ease-in: cubic-bezier(.55, 0, 1, .45);
-  --ease-in-out: cubic-bezier(.65, 0, .35, 1);
-  --spring: cubic-bezier(.16, 1, .3, 1);  /* legacy token name; confident deceleration without overshoot */
-  --dur-fast: 150ms; --dur: 320ms;
-  --shift: 14px;      /* how far things travel on enter */
-  --pop: .94;         /* start scale for popups */
+  --ease-in-out: cubic-bezier(.4, 0, .2, 1);
+  --spring: cubic-bezier(.2, .82, .2, 1); /* legacy token name; confident deceleration without overshoot */
+  --dur-fast: 150ms;
+  --dur: 260ms;
+  --shift: 12px;
+  --pop: .96;
 }
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #0a0a0b; --surface: #151516; --ink: #f7f7f7; --muted: #a4a4a8; --line: #2a2a2c;
-    --accent: #c2202f; --accent-dark: #ff8f98; --accent-hover: #a71a27; --accent-soft: #2a1013;
-    --accent-2: #ff8a80; --live: #4be39b; --live-soft: #173b2b;
-    --warning: #f1ce68; --warning-soft: #322b16;
-    --danger: #ff9b6b; --danger-hover: #ffb08a; --on-danger: #2a0d05; --danger-bg: #2a1410; --danger-line: #6b3320;
-    --scrim: rgba(0,0,0,.72);
-    --spot: linear-gradient(135deg, #9c0f1f, #d02a35);
-    --glow: 0 8px 28px rgba(220,40,55,.4);
-    --shadow-pop: 0 18px 50px rgba(0,0,0,.55);
+    --color-background: var(--palette-night);
+    --color-surface: var(--palette-night-surface);
+    --color-card: var(--palette-night-card);
+    --color-raised: var(--palette-night-raised);
+    --color-field: var(--palette-night-field);
+    --color-rail: #151119;
+    --color-hover: var(--palette-night-hover);
+    --color-foreground: var(--palette-night-ink);
+    --color-muted-foreground: var(--palette-night-muted);
+    --color-border: var(--palette-night-line);
+    --color-border-strong: rgb(255 255 255 / 16%);
+    --color-primary: #b72f49;
+    --color-primary-hover: #c83e58;
+    --color-primary-strong: #f19aa7;
+    --color-primary-soft: #351d27;
+    --color-accent: #ee9b7f;
+    --color-success: #63d4a3;
+    --color-success-soft: #1d382e;
+    --color-warning: #f0c66d;
+    --color-warning-soft: #352d1c;
+    --color-destructive: #f18d75;
+    --color-destructive-hover: #ffab92;
+    --color-destructive-soft: #351d21;
+    --color-destructive-border: #693d3f;
+    --color-destructive-foreground: #34120d;
+    --color-scrim: rgb(0 0 0 / 78%);
+    --color-focus: #f19aa7;
+    --color-edge-light: rgb(255 255 255 / 7%);
+    --color-stage: .58;
+    --brand-gradient: linear-gradient(135deg, #922741, #bd3451);
+    --shadow-accent: 0 10px 30px rgb(195 48 76 / 30%);
+    --shadow-floating: 0 0 0 1px rgb(255 255 255 / 5%), 0 20px 48px rgb(0 0 0 / 44%);
   }
 }
+
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0a0a0b; --surface: #151516; --ink: #f7f7f7; --muted: #a4a4a8; --line: #2a2a2c;
-  --accent: #c2202f; --accent-dark: #ff8f98; --accent-hover: #a71a27; --accent-soft: #2a1013;
-  --accent-2: #ff8a80; --live: #4be39b; --live-soft: #173b2b;
-  --warning: #f1ce68; --warning-soft: #322b16;
-  --danger: #ff9b6b; --danger-hover: #ffb08a; --on-danger: #2a0d05; --danger-bg: #2a1410; --danger-line: #6b3320;
-  --scrim: rgba(0,0,0,.72);
-  --spot: linear-gradient(135deg, #9c0f1f, #d02a35);
-  --glow: 0 8px 28px rgba(220,40,55,.4);
-  --shadow-pop: 0 18px 50px rgba(0,0,0,.55);
+  --color-background: var(--palette-night);
+  --color-surface: var(--palette-night-surface);
+  --color-card: var(--palette-night-card);
+  --color-raised: var(--palette-night-raised);
+  --color-field: var(--palette-night-field);
+  --color-rail: #151119;
+  --color-hover: var(--palette-night-hover);
+  --color-foreground: var(--palette-night-ink);
+  --color-muted-foreground: var(--palette-night-muted);
+  --color-border: var(--palette-night-line);
+  --color-border-strong: rgb(255 255 255 / 16%);
+  --color-primary: #b72f49;
+  --color-primary-hover: #c83e58;
+  --color-primary-strong: #f19aa7;
+  --color-primary-soft: #351d27;
+  --color-accent: #ee9b7f;
+  --color-success: #63d4a3;
+  --color-success-soft: #1d382e;
+  --color-warning: #f0c66d;
+  --color-warning-soft: #352d1c;
+  --color-destructive: #f18d75;
+  --color-destructive-hover: #ffab92;
+  --color-destructive-soft: #351d21;
+  --color-destructive-border: #693d3f;
+  --color-destructive-foreground: #34120d;
+  --color-scrim: rgb(0 0 0 / 78%);
+  --color-focus: #f19aa7;
+  --color-edge-light: rgb(255 255 255 / 7%);
+  --color-stage: .58;
+  --brand-gradient: linear-gradient(135deg, #922741, #bd3451);
+  --shadow-accent: 0 10px 30px rgb(195 48 76 / 30%);
+  --shadow-floating: 0 0 0 1px rgb(255 255 255 / 5%), 0 20px 48px rgb(0 0 0 / 44%);
 }
+
 /* Reduced motion: nothing travels or scales, fades still play. */
 @media (prefers-reduced-motion: reduce) { :root { --shift: 0px; --pop: 1; } }
