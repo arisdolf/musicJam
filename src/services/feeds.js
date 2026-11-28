@@ -1,4 +1,4 @@
-import { searchMusic, getSimilarTracks } from './youtube'
+import { searchMusic, getSimilarTracks, getTrending } from './youtube'
 import { getTaste } from '../utils/taste'
 
 export const GENRE_TABS = [
@@ -77,17 +77,35 @@ export async function getForYou(signal) {
   const taste = getTaste()
   if (!taste.count) return []
 
-  const list = await feedCached(`foryou|${taste.signature}`, async () => {
+  const list = await feedCached(`foryou|local-v2|${taste.signature}`, async () => {
+    const localJobs = [
+      searchMusic('OPM hits', { signal, limit: 20, order: 'relevance', extra: { relevanceLanguage: 'tl' } }),
+      getTrending(signal),
+    ]
     const jobs = taste.artists.map((name) => searchMusic(`${name} songs`, { signal, limit: 20, order: 'relevance' }))
     if (taste.seed) jobs.push(getSimilarTracks(taste.seed, signal))
     const vibe = GENRE_TABS.find((tab) => tab.id === taste.tags[0])
     if (vibe) jobs.push(searchMusic(vibe.queries[0], { signal, limit: 20, order: 'relevance', extra: vibe.extra || {} }))
 
-    const settled = await Promise.allSettled(jobs)
+    const [localSettled, personalizedSettled] = await Promise.all([
+      Promise.allSettled(localJobs),
+      Promise.allSettled(jobs),
+    ])
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
-    const lists = settled.filter((r) => r.status === 'fulfilled').map((r) => r.value)
-    if (!lists.length) throw settled.find((r) => r.status === 'rejected')?.reason || new Error('Could not build your feed.')
-    return tidy(interleave(lists), { limit: 40 })
+    const localLists = localSettled.filter((r) => r.status === 'fulfilled').map((r) => r.value)
+    const personalizedLists = personalizedSettled.filter((r) => r.status === 'fulfilled').map((r) => r.value)
+    if (!localLists.length && !personalizedLists.length) {
+      const failure = [...localSettled, ...personalizedSettled].find((r) => r.status === 'rejected')
+      throw failure?.reason || new Error('Could not build your feed.')
+    }
+    const local = interleave(localLists).slice(0, 12)
+    const personalized = interleave(personalizedLists)
+    const combined = []
+    for (let i = 0; i < Math.max(local.length, personalized.length); i++) {
+      if (local[i]) combined.push(local[i])
+      if (personalized[i]) combined.push(personalized[i])
+    }
+    return tidy(combined, { limit: 40 })
   })
 
   const playedIds = new Set(taste.playedIds)

@@ -405,7 +405,7 @@ function phChart(signal) {
 }
 
 export function getSimilarTracks(seed, signal) {
-  return cached(`similar5|${seed.id}`, async () => {
+  return cached(`similar6|${seed.id}`, async () => {
     let text = `${seed.title} ${seed.artist}`
     try {
       const data = await yt('videos', { part: 'snippet', id: seed.id }, signal)
@@ -451,8 +451,8 @@ export function getSimilarTracks(seed, signal) {
       // [source, max songs from it]; the vibe source appears twice so it fills the most slots.
      const sources = [
   { list: byViews(byArtist).filter((t) => sameArtist(t) && good(t, strictness)), cap: 2, taken: 0 },
-  { list: byViews(chart).filter((t) => good(t, strictness)), cap: 10, taken: 0 },
-  { list: byViews(byVibe).filter((t) => good(t, strictness)), cap: 7, taken: 0 },
+  { list: byViews(chart).filter((t) => good(t, strictness)), cap: 14, taken: 0 },
+  { list: byViews(byVibe).filter((t) => good(t, strictness)), cap: 6, taken: 0 },
 ]
       let progress = true
       while (out.length < 50 && progress) {
@@ -482,7 +482,7 @@ export function getSimilarTracks(seed, signal) {
 // Each page costs ~101 quota units (100 search + 1 details). The details call is what lets us
 // check the category and the length, so only real songs of a sensible length come back.
 export function searchSongsPage(query, pageToken, signal) {
-  return cached(`page|${query.toLowerCase()}|${pageToken || 'first'}`, async () => {
+  return cached(`page-v2|${query.toLowerCase()}|${pageToken || 'first'}`, async () => {
     const search = await yt('search', {
       part: 'snippet', type: 'video', videoCategoryId: '10',
       videoEmbeddable: 'true', videoSyndicated: 'true', regionCode: REGION,
@@ -509,11 +509,39 @@ export function searchSongsPage(query, pageToken, signal) {
       if (score === null) return
       scored.push({ track, score, index })
     })
-    // Prefer Topic / official audio / lyric videos (score 4+). Plain music videos only fill in
-    // when there are too few clean results, so rare songs still show up.
+    const words = (value) => String(value || '').toLowerCase().match(/[\p{L}\p{N}]+/gu) || []
+    const titleMatch = (title) => {
+      const titleWords = words(title)
+      const queryWords = words(query)
+      const normalizedTitle = titleWords.join(' ')
+      const normalizedQuery = queryWords.join(' ')
+      if (!normalizedTitle || !normalizedQuery) return 0
+      if (normalizedTitle === normalizedQuery) return 4
+      if (normalizedTitle.startsWith(normalizedQuery)) return 3
+      if (normalizedTitle.includes(normalizedQuery)) return 2
+      const titleCoverage = titleWords.filter((word) => queryWords.includes(word)).length / titleWords.length
+      const queryCoverage = queryWords.filter((word) => titleWords.includes(word)).length / queryWords.length
+      return Math.max(titleCoverage, queryCoverage)
+    }
+    const titleMatches = new Map(scored.map((entry) => [entry.track.id, titleMatch(entry.track.title)]))
+    // Prefer Topic / official audio / lyric videos (score 4+). Keep title matches in the pool,
+    // so exact song matches are not hidden when enough clean results exist.
     const clean = scored.filter((entry) => entry.score >= 4)
-    const pool = clean.length >= 5 ? clean : scored
-    pool.sort((a, b) => b.score - a.score || a.index - b.index)
+    const matchingTitles = scored.filter((entry) => titleMatches.get(entry.track.id) > 0)
+    const candidates = clean.length >= 5 ? [...matchingTitles, ...clean] : scored
+    const seen = new Set()
+    const pool = candidates.filter((entry) => {
+      if (seen.has(entry.track.id)) return false
+      seen.add(entry.track.id)
+      return true
+    })
+    pool.sort((a, b) =>
+      titleMatches.get(b.track.id) - titleMatches.get(a.track.id)
+      || Number(isPopular(b.track)) - Number(isPopular(a.track))
+      || (b.track.views || 0) - (a.track.views || 0)
+      || b.score - a.score
+      || a.index - b.index,
+    )
     return { tracks: pool.map((entry) => entry.track), nextPageToken }
   })
 }

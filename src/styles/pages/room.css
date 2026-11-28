@@ -17,7 +17,7 @@
 
 .room-bar { flex-wrap: nowrap; }
 .room-meta-row { margin: -4px 0 14px; }
-.room-search-input { position: relative; margin-bottom: 4px; }
+.room-search-input { position: relative; margin-bottom: 8px; }
 .room-search-input input.search { padding-right: 48px; margin-bottom: 0; }
 .room-search-input .search-clear { position: absolute; top: 4px; right: 5px; width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); }
 .room-search-input .search-clear:hover:not(:disabled) { background: var(--surface); color: var(--ink); }
@@ -31,4 +31,13 @@
 
 .similar-results { max-height: 420px; overflow-y: auto; overscroll-behavior: contain; }
 
+.room-search-guidance { margin: 4px 2px 0; color: var(--muted); font-size: 13px; }
 .room-search-results { max-height: min(60dvh, 460px); overflow-y: auto; overscroll-behavior: contain; }
+.room-search-list .track { gap: 12px; padding: 10px 12px; }
+.room-search-list .track img { width: 60px; height: 44px; border-radius: 8px; }
+.room-search-list .track-text strong { font-size: 14px; }
+
+@media (max-width: 480px) {
+  .room-search-list .track { gap: 8px; padding: 8px; }
+  .room-search-list .track img { width: 48px; height: 36px; }
+}

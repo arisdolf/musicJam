@@ -12,14 +12,13 @@ import { useDragReorder } from '../hooks/useDragReorder'
 import LikeButton from '../components/LikeButton'
 import TrackMenu from '../components/TrackMenu'
 
-export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
+export default function Playlists({ currentTrack, onBrowse, onPlayTracks, onQueueTrack }) {
   const IMPORT_LIMIT = 100 // each song costs ~101 YouTube quota units; the free daily quota is 10,000
   const QUOTA_REASONS = ['quotaExceeded', 'dailyLimitExceeded', 'RESOURCE_EXHAUSTED']
   const { user, openAuth, playlists, createPlaylist, renamePlaylist, removeFromPlaylist, reorderPlaylistTracks, deletePlaylist } = useAccount()
   const [name, setName] = useState('')
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState(null)
-  const [currentTrackId, setCurrentTrackId] = useState(null)
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState('')
   const [error, setError] = useState('')
@@ -80,7 +79,7 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
     setBusy(true)
     try {
       await deletePlaylist(deleteTarget.id)
-      if (selectedId === deleteTarget.id) { setSelectedId(null); setCurrentTrackId(null) }
+      if (selectedId === deleteTarget.id) setSelectedId(null)
       setDeleteTarget(null)
     } catch (err) { setDeleteTarget(null); setError(err.message || 'Could not delete playlist.') }
     finally { setBusy(false) }
@@ -98,14 +97,12 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
     setError('')
     try {
       await removeFromPlaylist(selected.id, track.id)
-      if (currentTrackId === track.id) setCurrentTrackId(null)
     }
     catch (err) { setError(err.message || 'Could not remove track.') }
   }
 
   const playAt = (index) => {
     if (!selected?.tracks[index]) return
-    setCurrentTrackId(selected.tracks[index].id)
     onPlayTracks(selected.tracks, index)
   }
 
@@ -178,15 +175,13 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
   }
 
 
-  const openPlaylist = (playlist, playFirst = false) => withViewTransition(() => {
+  const openPlaylist = (playlist) => withViewTransition(() => {
     setSelectedId(playlist.id)
-    setCurrentTrackId(playFirst ? playlist.tracks[0]?.id || null : null)
     setError('')
   })
 
   const showPlaylists = () => withViewTransition(() => {
     setSelectedId(null)
-    setCurrentTrackId(null)
     setEditing(false)
     setError('')
   })
@@ -221,9 +216,10 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
           ? <div className="playlist-empty-state compact"><Music2 size={28} /><h2>This playlist is empty</h2><p className="muted">Find a song you like and save it here.</p><button className="btn btn-primary btn-small" onClick={onBrowse}><Search size={15} /> Find songs</button></div>
           : <ul ref={trackListRef} className="track-list playlist-track-list">
             {selected.tracks.map((track, index) => {
-              const isCurrent = track.id === currentTrackId
+              const isCurrent = track.id === currentTrack?.id
               return <li
                 className={`track playlist-track${isCurrent ? ' active' : ''}${dragIndex === index ? ' is-dragging' : ''}`}
+                aria-current={isCurrent ? 'true' : undefined}
                 key={track.id}
                 style={itemStyle(index)}
               >
@@ -310,7 +306,7 @@ export default function Playlists({ onBrowse, onPlayTracks, onQueueTrack }) {
             </button>
             <div className="playlist-card-actions">
               <button className="btn btn-text btn-small" onClick={() => {
-                openPlaylist(playlist, true)
+                openPlaylist(playlist)
                 onPlayTracks(playlist.tracks, 0)
               }} disabled={!playlist.tracks.length}><Play size={14} /> Play</button>
               {!playlist.isLiked && <button className="icon-btn" onClick={() => remove(playlist)} aria-label={`Delete ${playlist.name}`} title="Delete playlist"><Trash2 size={15} /></button>}

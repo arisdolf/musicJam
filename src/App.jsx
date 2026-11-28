@@ -239,7 +239,7 @@ const renderContent = () => {
 
   switch (view) {
     case 'create': return <JoinRoom onJoin={joinRoom} />
-    case 'playlists': return user ? <Playlists onBrowse={() => navigate('home')} onPlayTracks={playTracks} onQueueTrack={queueTrack} /> : homePage
+    case 'playlists': return user ? <Playlists currentTrack={currentTrack} onBrowse={() => navigate('home')} onPlayTracks={playTracks} onQueueTrack={queueTrack} /> : homePage
     case 'recent': return <RecentRooms onJoin={joinRoom} />
     case 'settings': return user ? <Settings roomCode={roomCode} section={settingsSection} onSectionChange={setSettingsSection} /> : homePage
     default: return homePage

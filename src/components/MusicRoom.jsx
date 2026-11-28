@@ -29,28 +29,26 @@ export default function MusicRoom({ roomCode, room, updateRoom, connection, memb
   const [clearOpen, setClearOpen] = useState(false)
   const clearQueue = () => updateRoom((state) => ({ ...state, queue: [], current: 0, playing: false }))
   useTopbar(`Room ${roomCode}`, () => setLeaveOpen(true))
-  
-  
- 
-const search = useSongSearch(query)
-const searchEnd = useRef(null)
-const searchBox = useRef(null)
+  const search = useSongSearch(query)
+  const { hasMore: searchHasMore, loadMore: loadMoreSearch, tracks: searchTracks } = search
+  const searchEnd = useRef(null)
+  const searchBox = useRef(null)
   const [inviteOpen, setInviteOpen] = useState(false)
   const autoAdded = useRef(new Set())                 // songs we already auto-queued suggestions for
   const latest = useRef({ queue: room.queue, onQueueTracks })
   useEffect(() => { latest.current = { queue: room.queue, onQueueTracks } })
-  
+
   useEffect(() => {
     const root = searchBox.current
     const node = searchEnd.current
-    if (!root || !node || !search.hasMore) return undefined
+    if (!root || !node || !searchHasMore) return undefined
     const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) search.loadMore() },
+      ([entry]) => { if (entry.isIntersecting) loadMoreSearch() },
       { root, rootMargin: '0px 0px 160px 0px' },
     )
     observer.observe(node)
     return () => observer.disconnect()
-  }, [search.hasMore, search.loadMore, search.tracks.length])
+  }, [searchHasMore, loadMoreSearch, searchTracks.length])
 
   useEffect(() => {
     const only = room.queue.length === 1 ? room.queue[0] : null
@@ -141,11 +139,24 @@ const searchBox = useRef(null)
         <input className="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search songs or artists" aria-label="Search songs or artists" />
         <button type="button" className="search-clear" onClick={() => setQuery('')} disabled={!query} aria-label="Clear song search"><X size={17} /></button>
       </div>
-      {query && <div className="results">
-        {searching ? <TrackSkeletonList count={3} actions={4} className="search-skeleton" />
-          : searchError ? <p className="message">{searchError}</p>
-
-            : results.map((track) => <SongRow key={track.id} track={track} queued={queueIds.includes(track.id)} onPlayTrack={onPlayTrack} onPlayNext={onPlayNext} onQueueTrack={onQueueTrack} />)}
+      {search.q && search.q.length < 3 && <p className="room-search-guidance" role="status">Type at least 3 characters to search.</p>}
+      {search.q.length >= 3 && <div
+        className="results room-search-results"
+        ref={searchBox}
+        role="region"
+        aria-label={`Search results for ${search.q}`}
+        aria-busy={search.waiting || search.loadingMore}
+      >
+        {search.waiting
+          ? <TrackSkeletonList count={3} actions={2} className="search-skeleton" />
+          : <>
+            {search.tracks.length > 0 && <div className="room-search-list" role="list" aria-label="Songs">
+              {search.tracks.map((track) => <SongRow key={track.id} track={track} queued={queueIds.includes(track.id)} onPlayTrack={onPlayTrack} onPlayNext={onPlayNext} onQueueTrack={onQueueTrack} />)}
+            </div>}
+            {!search.tracks.length && !search.error && !search.loadingMore && !search.hasMore && <p className="empty" role="status">No songs found. Try another title or artist.</p>}
+            {search.error && <p className="message" role="status">{search.error}</p>}
+            {search.hasMore && <div ref={searchEnd} className="hs-more">{search.loadingMore && <Spinner size={20} label="Loading more songs" />}</div>}
+          </>}
       </div>}
     </section>
     {seed && similar.seedId === seed.id && <section className="block">
@@ -157,15 +168,9 @@ const searchBox = useRef(null)
         ? <TrackSkeletonList count={3} actions={2} />
         : similar.error
           ? <p className="message">{similar.error}</p>
-          : <div className="results similar-results">
+          : <div className="results similar-results" role="list" aria-label="Similar songs">
             {similar.tracks.map((track) => <SongRow key={track.id} track={track} queued={queueIds.includes(track.id)} onPlayTrack={onPlayTrack} onPlayNext={onPlayNext} onQueueTrack={onQueueTrack} />)}
           </div>}
-      {query && <div className="results room-search-results" ref={searchBox}>
-  {search.waiting && !search.tracks.length ? <TrackSkeletonList count={3} actions={2} className="search-skeleton" />
-    : search.error && !search.tracks.length ? <p className="message">{search.error}</p>
-      : search.tracks.map((track) => <SongRow key={track.id} track={track} queued={queueIds.includes(track.id)} onPlayTrack={onPlayTrack} onPlayNext={onPlayNext} onQueueTrack={onQueueTrack} />)}
-  {search.hasMore && <div ref={searchEnd} className="hs-more">{search.loadingMore && <Spinner size={20} label="Loading more songs" />}</div>}
-</div>}
     </section>}
     <section className="block">
       <button className="block-toggle" onClick={() => setPlaylistsOpen((open) => !open)} aria-expanded={playlistsOpen}>
@@ -292,7 +297,7 @@ function RoomPlaylists({ onPlayTracks, onQueueTracks, onPlayTrack, onQueueTrack 
 }
 
 function SongRow({ track, queued, onPlayTrack, onPlayNext, onQueueTrack }) {
-  return <div className="track">
+  return <div className="track" role="listitem">
     <img src={track.thumbnail} alt="" loading="lazy" decoding="async" />
     <button className="track-text as-button" onClick={() => onPlayTrack(track)} aria-label={`Play ${track.title}`}>
       <strong>{track.title}</strong><small>{track.artist}</small>
